@@ -1,0 +1,31 @@
+{
+  "reviews": {
+    "4191caad42": {
+      "original_sentiment": "Positive",
+      "corrected_sentiment": "Mixed",
+      "status": "overridden",
+      "notes": "Mentions setup friction, should be mixed"
+    },
+    "cd14fa186928": {
+      "is_override": false,
+      "status": "Agreed",
+      "original_sentiment": "Positive",
+      "rating": 5,
+      "snippet": "Highly satisfied, call quality works flawlessly",
+      "timestamp": "2026-09-26 21:01:53"
+    }
+  },
+  "insights": {
+    "query_577b9cf6ee": {
+      "query": "Why are customers returning this product?",
+      "rating": "Helpful",
+      "answer_snippet": "The primary driver behind customer dissatisfaction and potential return requests is **Overpriced**, mentioned in 6.1% of",
+      "timestamp": "2026-09-26 15:07:33"
+    }
+  },
+  "stats": {
+    "total": 2,
+    "agreed": 1,
+    "overridden": 1
+  }
+}

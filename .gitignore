@@ -1,0 +1,39 @@
+.env
+.env.*
+!.env.example
+
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+
+.streamlit/secrets.toml
+
+*.log
+.DS_Store
+
+*.zip
+
+# Large/local data
+*.csv
+*.xlsx
+*.parquet
+
+# Model/cache files
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# IDE
+.vscode/
+.idea/
+
+# Local datasets and generated caches
+raw_data_v2/
+processed/
+scratch/
+*.npy
+*.json.gz

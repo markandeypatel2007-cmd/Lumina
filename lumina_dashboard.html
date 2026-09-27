@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumina — Customer Feedback Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#08090E; --surface:#111422; --surface2:#161A2B; --border:rgba(255,255,255,0.08);
+  --text:#F8FAFC; --dim:#94A3B8; --brand:#6366F1; --brand2:#8B5CF6;
+  --pos:#10B981; --neg:#EF4444; --neu:#F59E0B;
+  --grad:linear-gradient(135deg,var(--brand),var(--brand2));
+  font-family:'Plus Jakarta Sans',sans-serif;
+  padding-top:env(safe-area-inset-top,0); padding-bottom:env(safe-area-inset-bottom,0);
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--ink);color:var(--text);}
+h1,h2,h3,.disp{font-family:'Space Grotesk',sans-serif;}
+button{font-family:inherit;cursor:pointer;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+.app{display:flex;min-height:100vh;}
+/* SIDEBAR */
+.side{width:236px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
+  padding:22px 14px;display:flex;flex-direction:column;gap:22px;}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px;}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:var(--grad);
+  display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;}
+.brand span{font-size:19px;font-weight:700;letter-spacing:-.3px;}
+nav{display:flex;flex-direction:column;gap:3px;}
+.nav-btn{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;border:none;
+  background:transparent;color:var(--dim);font-size:13.5px;font-weight:500;text-align:left;width:100%;
+  transition:background .15s,color .15s;}
+.nav-btn svg{width:17px;height:17px;flex-shrink:0;}
+.nav-btn:hover{background:var(--surface2);color:var(--text);}
+.nav-btn.active{background:var(--surface2);color:var(--text);box-shadow:inset 2px 0 0 var(--brand);}
+.side-foot{margin-top:auto;font-size:11.5px;color:var(--dim);padding:0 6px;line-height:1.5;}
+
+/* MAIN */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;
+  border-bottom:1px solid var(--border);gap:16px;flex-wrap:wrap;}
+.topbar h1{font-size:18px;margin:0;font-weight:600;}
+.topbar .sub{color:var(--dim);font-size:12.5px;margin-top:2px;}
+.pill{background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:7px 14px;
+  font-size:12.5px;color:var(--dim);}
+.content{padding:26px 28px 60px;overflow-x:auto;}
+.view{display:none;} .view.active{display:block;}
+
+/* CARDS / GRID */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;}
+.kpi .num{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;}
+.kpi .lbl{color:var(--dim);font-size:12.5px;margin-top:2px;}
+.kpi.hero .num{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:820px){.grid2{grid-template-columns:1fr;} .side{width:76px;} .brand span,.nav-btn span{display:none;} .brand{justify-content:center;}}
+
+.section-title{font-size:15px;font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+.quote-list{display:flex;flex-direction:column;gap:10px;}
+.quote{background:var(--surface2);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;border-left:3px solid var(--border);}
+.quote.neg{border-left-color:var(--neg);} .quote.pos{border-left-color:var(--pos);}
+.quote .tag{font-size:11px;color:var(--dim);margin-bottom:4px;text-transform:none;}
+
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+.bar-row .lbl{width:130px;font-size:12.5px;color:var(--dim);flex-shrink:0;}
+.bar-track{flex:1;height:9px;background:var(--surface2);border-radius:5px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:5px;}
+.bar-row .val{width:42px;text-align:right;font-size:12.5px;font-weight:600;flex-shrink:0;}
+
+.tagcloud{display:flex;flex-wrap:wrap;gap:8px;}
+.tag{padding:6px 12px;border-radius:100px;font-size:12.5px;font-weight:500;border:1px solid var(--border);}
+
+.prod-card{background:var(--surface2);border-radius:12px;padding:16px;border:1px solid var(--border);}
+.prod-card.best{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand);}
+.fit-score{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;}
+
+input[type=text],textarea{width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:9px;color:var(--text);padding:11px 13px;font-size:13.5px;font-family:inherit;}
+input::placeholder,textarea::placeholder{color:var(--dim);}
+.btn{background:var(--grad);border:none;color:#fff;padding:11px 18px;border-radius:9px;font-weight:600;font-size:13.5px;}
+.btn.ghost{background:var(--surface2);border:1px solid var(--border);color:var(--text);}
+.sample-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.chip{padding:7px 13px;border-radius:100px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--dim);font-size:12px;}
+.chip:hover{color:var(--text);border-color:var(--brand);}
+
+.review-row{padding:13px 0;border-bottom:1px solid var(--border);}
+.review-row .meta{display:flex;gap:10px;align-items:center;margin-bottom:5px;font-size:11.5px;color:var(--dim);}
+.star{color:var(--neu);}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);opacity:0;
+  background:var(--surface2);border:1px solid var(--border);padding:12px 20px;border-radius:10px;
+  font-size:13px;transition:.25s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+<symbol id="i-overview" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-sentiment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 18V10M12 18V5M19 18v-6"/></symbol>
+<symbol id="i-aspect" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-compare" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="6.5"/><circle cx="15" cy="12" r="6.5"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l5-6 4 3 7-9"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/></symbol>
+<symbol id="i-ingest" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4v11M8 12l4 4 4-4M4 19h16"/></symbol>
+<symbol id="i-report" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+</svg>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="brand-mark">L</div><span>Lumina</span></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">Prototype UI · sample data<br>Wire to your Python backend for live results.</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <button id="backBtn" class="chip" style="display:none;margin-bottom:8px">← All 6.8M reviews</button>
+        <h1 id="topTitle">All Categories · Full Dataset</h1>
+        <div class="sub" id="topSub">Amazon Fashion · Digital Music · Arts &amp; Crafts · Electronics</div>
+      </div>
+      <div class="pill" id="topPill">6,794,913 reviews analyzed</div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const TABS = [
+  {id:"overview", label:"Product Overview", icon:"i-overview"},
+  {id:"sentiment", label:"Sentiment & Ratings", icon:"i-sentiment"},
+  {id:"aspect", label:"Aspect & Word Cloud", icon:"i-aspect"},
+  {id:"compare", label:"Comparison", icon:"i-compare"},
+  {id:"trend", label:"Trend & Spikes", icon:"i-trend"},
+  {id:"search", label:"Search Reviews", icon:"i-search"},
+  {id:"ingest", label:"Ingestion Hub", icon:"i-ingest"},
+  {id:"report", label:"Report", icon:"i-report"},
+];
+
+// ---- Datasets: GLOBAL (all 6.8M reviews) shown by default, PRODUCT after a link is analyzed ----
+const GLOBAL = {
+  mode:"global", title:"All Categories · Full Dataset", sub:"Amazon Fashion · Digital Music · Arts & Crafts · Electronics",
+  reviews:6794913, pos:74.2, neg:14.6, neu:11.2, avgRating:4.2,
+  complaints:[
+    {t:"Shipping / Delivery delays", pct:19, q:"Arrived over a week late with no tracking updates the whole time."},
+    {t:"Battery / Charging issues", pct:16, q:"Stopped holding a charge after about two months of normal use."},
+    {t:"Product feels cheap / breaks", pct:13, q:"Fell apart within weeks — plastic housing cracked on first drop."},
+  ],
+  praises:[
+    {t:"Works as expected", pct:37, q:"Exactly as described, no surprises, does the job well."},
+    {t:"Good value for money", pct:29, q:"Way better quality than I expected for the price."},
+    {t:"Fast delivery", pct:24, q:"Ordered Monday, arrived Wednesday — great shipping experience."},
+  ],
+  aspects:[
+    {n:"Electronics", p:71}, {n:"Amazon Fashion", p:79}, {n:"Digital Music", p:88},
+    {n:"Arts, Crafts & Sewing", p:83}, {n:"Delivery / Shipping", p:66}, {n:"Returns / Refunds", p:52},
+  ],
+  words:[["quality",1],["shipping",-1],["battery",-1],["value",1],["broken",-1],["comfortable",1],
+    ["late delivery",-1],["durable",1],["cheap",-1],["easy setup",1],["overpriced",-1],["reliable",1]],
+  months:["'23 Q1","'23 Q2","'23 Q3","'23 Q4","'24 Q1","'24 Q2","'24 Q3","'24 Q4"],
+  trend:[71,70,72,69,73,72,74,74],
+  ratingDist:[41,24,13,11,11],
+  reviewsSample:[
+    {r:5,t:"Great quality for the price, exactly as pictured.",cat:"Amazon Fashion"},
+    {r:2,t:"Shipping took forever and the box arrived crushed.",cat:"Arts, Crafts and Sewing"},
+    {r:4,t:"Sound quality is impressive for the price point.",cat:"Digital Music"},
+    {r:1,t:"Battery died within a month, requested a refund.",cat:"Electronics"},
+    {r:5,t:"Fits true to size and the material feels premium.",cat:"Amazon Fashion"},
+    {r:3,t:"Decent but customer service was slow to respond.",cat:"Electronics"},
+    {r:5,t:"Fast shipping and well packaged, no complaints.",cat:"Arts, Crafts and Sewing"},
+  ],
+};
+
+const PRODUCTS = {
+  sony: {
+    mode:"product", name:"Sony WH-1000XM5 Wireless Headphones", category:"Electronics · Audio", reviews:1842,
+    pos:68, neg:22, neu:10, avgRating:4.3,
+    complaints:[
+      {t:"Battery drains quickly", pct:14, q:"Battery life dropped fast after a few months — used to get 30hrs, now barely 12."},
+      {t:"Overpriced for the update", pct:9, q:"Sounds nearly identical to the XM4 for $50 more. Not sure the upgrade was worth it."},
+      {t:"Uncomfortable after long wear", pct:6, q:"Great sound but my ears get sore after about two hours straight."},
+    ],
+    praises:[
+      {t:"Excellent noise cancellation", pct:41, q:"Blocks out my entire open-plan office. Genuinely life-changing on flights."},
+      {t:"Great sound quality", pct:33, q:"Rich bass, clear mids — best sounding headphones I've owned at this price."},
+      {t:"Comfortable for daily use", pct:22, q:"Wore them on an 8hr flight with zero discomfort. Very well padded."},
+    ],
+    aspects:[
+      {n:"Audio / Sound", p:88}, {n:"Noise Cancelling", p:91}, {n:"Battery", p:64},
+      {n:"Comfort", p:76}, {n:"Price / Value", p:58}, {n:"Build Quality", p:81},
+    ],
+    words:[["comfortable",1],["battery",1],["noise-cancelling",1],["expensive",-1],["bass",1],
+      ["sturdy",1],["app",0],["clunky case",-1],["clear calls",1],["overpriced",-1],["premium",1],["laggy bluetooth",-1]],
+    months:["Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"],
+    trend:[62,64,60,58,49,55,68,71],
+    ratingDist:[46,26,12,9,7],
+    reviewsSample:[
+      {r:5,t:"Best headphones I've owned. The ANC is unreal on flights.",cat:"Audio"},
+      {r:2,t:"Battery degraded fast — 12hrs now instead of the advertised 30.",cat:"Battery"},
+      {r:4,t:"Comfortable for hours, though the case feels a bit cheap.",cat:"Comfort"},
+      {r:5,t:"Sound is rich and detailed, calls are crystal clear too.",cat:"Audio"},
+      {r:3,t:"Good but pricey — the XM4 was nearly as good for less.",cat:"Price"},
+      {r:1,t:"Bluetooth kept disconnecting mid-call, very frustrating.",cat:"Connectivity"},
+      {r:5,t:"Worth every penny for the noise cancellation alone.",cat:"Audio"},
+    ],
+    compare:[
+      {n:"Sony WH-1000XM5", fit:92, price:"$398", pos:68, best:true},
+      {n:"Bose QC Ultra", fit:81, price:"$429", pos:71, best:false},
+      {n:"Anker Soundcore Q45", fit:66, price:"$99", pos:59, best:false},
+    ],
+    spike:{t:"Battery complaints · Jul", q:"Complaint share jumped from 8% to 19% month-over-month — worth investigating a firmware or batch issue."},
+  },
+};
+
+let state = { mode:"global", data: GLOBAL };
+let liveGlobal = GLOBAL;
+
+function el(html){const d=document.createElement("div");d.innerHTML=html.trim();return d.firstChild;}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove("show"),2200);}
+
+// ---- Sidebar nav ----
+const nav = document.getElementById("nav");
+TABS.forEach((tb,i)=>{
+  const b = el(`<button class="nav-btn ${i===0?'active':''}" data-id="${tb.id}">
+    <svg><use href="#${tb.icon}"/></svg><span>${tb.label}</span></button>`);
+  b.onclick=()=>showTab(tb.id);
+  nav.appendChild(b);
+});
+
+function showTab(id){
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.id===id));
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="v-"+id));
+}
+
+// ---- Content: rendered fresh from `data` (GLOBAL by default, a PRODUCT after Analyze) ----
+const content = document.getElementById("content");
+const R = (n)=>n.toLocaleString();
+
+function phraseAt(arr, i, fallback){
+  return (arr && arr[i] && arr[i].t) ? arr[i].t : fallback;
+}
+
+const SAMPLE_URLS = {
+  "Sony WH-1000XM5": "https://www.amazon.com/dp/B09XS7JWHH",
+  "Anker Soundcore": "https://www.amazon.com/dp/B09VPHVT2Z",
+  "Kindle Paperwhite": "https://www.amazon.com/dp/B08KTZ8249",
+  "Nike Pegasus": "https://www.nike.com/running/pegasus-zoom",
+  "Logitech MX Master": "https://www.logitech.com/mx-master-3s",
+  "Koss Porta Pro": "https://www.amazon.com/dp/B00004T8R2",
+};
+
+function renderContent(data){
+  const isProduct = data.mode === "product";
+  const complaints = data.complaints || [];
+  const praises = data.praises || [];
+  const aspects = data.aspects || [];
+  const words = data.words || [];
+  const months = data.months || [];
+  const trend = data.trend || [];
+  const ratingDist = data.ratingDist || [0,0,0,0,0];
+  const reviewsSample = data.reviewsSample || [];
+  const topPraise = phraseAt(praises, 0, "overall quality");
+  const topComplaint = phraseAt(complaints, 0, "occasional friction");
+  const secondComplaint = phraseAt(complaints, 1, "shipping delays");
+  content.innerHTML = `
+<div class="view active" id="v-overview">
+  <div class="kpi-row">
+    <div class="card kpi hero"><div class="num">${data.pos}%</div><div class="lbl">Positive sentiment</div></div>
+    <div class="card kpi"><div class="num" style="color:var(--neg)">${data.neg}%</div><div class="lbl">Negative sentiment</div></div>
+    <div class="card kpi"><div class="num" style="color:var(--neu)">${data.neu}%</div><div class="lbl">Neutral sentiment</div></div>
+    <div class="card kpi"><div class="num">${data.avgRating ?? "—"}</div><div class="lbl">Average rating</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="section-title"><span class="dot" style="background:var(--neg)"></span>Top complaints</div>
+      <div class="quote-list">${complaints.length ? complaints.map(c=>`<div class="quote neg"><div class="tag">${c.t} · ${c.pct}% of complaints</div>"${c.q || ""}"</div>`).join("") : `<p style="color:var(--dim);margin:0">No frequent complaint phrases in this set.</p>`}</div>
+    </div>
+    <div class="card">
+      <div class="section-title"><span class="dot" style="background:var(--pos)"></span>Top positives</div>
+      <div class="quote-list">${praises.length ? praises.map(c=>`<div class="quote pos"><div class="tag">${c.t} · ${c.pct}% of praise</div>"${c.q || ""}"</div>`).join("") : `<p style="color:var(--dim);margin:0">No frequent praise phrases in this set.</p>`}</div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v-sentiment">
+  <div class="grid2">
+    <div class="card">
+      <div class="section-title">Sentiment breakdown</div>
+      <div class="bar-row"><div class="lbl">Positive</div><div class="bar-track"><div class="bar-fill" style="width:${data.pos}%;background:var(--pos)"></div></div><div class="val">${data.pos}%</div></div>
+      <div class="bar-row"><div class="lbl">Negative</div><div class="bar-track"><div class="bar-fill" style="width:${data.neg}%;background:var(--neg)"></div></div><div class="val">${data.neg}%</div></div>
+      <div class="bar-row"><div class="lbl">Neutral</div><div class="bar-track"><div class="bar-fill" style="width:${data.neu}%;background:var(--neu)"></div></div><div class="val">${data.neu}%</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Rating distribution</div>
+      ${[5,4,3,2,1].map((s,i)=>`<div class="bar-row"><div class="lbl">${s} star</div><div class="bar-track"><div class="bar-fill" style="width:${ratingDist[i]||0}%;background:var(--brand)"></div></div><div class="val">${ratingDist[i]||0}%</div></div>`).join("")}
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v-aspect">
+  <div class="grid2">
+    <div class="card">
+      <div class="section-title">${isProduct?"Aspect sentiment (% positive)":"Category sentiment (% positive)"}</div>
+      ${aspects.length ? aspects.map(a=>`<div class="bar-row"><div class="lbl">${a.n}</div><div class="bar-track"><div class="bar-fill" style="width:${a.p}%;background:${a.p>=70?'var(--pos)':a.p>=55?'var(--neu)':'var(--neg)'}"></div></div><div class="val">${a.p}%</div></div>`).join("") : `<p style="color:var(--dim);margin:0">No aspect mentions yet.</p>`}
+    </div>
+    <div class="card">
+      <div class="section-title">Frequent vocabulary</div>
+      <div class="tagcloud">${words.map(([w,s])=>`<span class="tag" style="font-size:${11+Math.random()*7}px;color:${s>0?'var(--pos)':s<0?'var(--neg)':'var(--dim)'};border-color:${s>0?'var(--pos)':s<0?'var(--neg)':'var(--border)'}">${w}</span>`).join("")}</div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="v-compare">
+  ${data.compare && data.compare.length ? `
+  <div class="section-title">Head-to-head comparison</div>
+  <div class="grid2" style="grid-template-columns:repeat(3,1fr)">
+    ${data.compare.map(c=>`<div class="prod-card ${c.best?'best':''}">
+      ${c.best?'<div style="color:var(--brand);font-size:11px;font-weight:600;margin-bottom:6px">BEST FIT</div>':''}
+      <div style="font-weight:600;margin-bottom:10px">${c.n}</div>
+      <div class="fit-score">${c.fit}%</div><div style="color:var(--dim);font-size:12px;margin-bottom:12px">fit score</div>
+      <div style="font-size:12.5px;color:var(--dim);display:flex;justify-content:space-between"><span>Price</span><span style="color:var(--text)">${c.price}</span></div>
+      <div style="font-size:12.5px;color:var(--dim);display:flex;justify-content:space-between;margin-top:4px"><span>Positive</span><span style="color:var(--text)">${c.pos}%</span></div>
+    </div>`).join("")}
+  </div>` : `<div class="card"><p style="color:var(--dim);margin:0">Analyze a product link (Ingestion Hub tab) to compare it head-to-head against similar products.</p></div>`}
+</div>
+
+<div class="view" id="v-trend">
+  <div class="card">
+    <div class="section-title">Positive sentiment over time</div>
+    ${trend.length > 1 ? `<svg viewBox="0 0 560 160" width="100%" style="max-width:560px">
+      <polyline fill="none" stroke="url(#lg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+        points="${trend.map((v,i)=>`${i*(560/(trend.length-1))},${150-v*1.5}`).join(" ")}"/>
+      <defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#FF6A3D"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs>
+      ${trend.map((v,i)=>`<circle cx="${i*(560/(trend.length-1))}" cy="${150-v*1.5}" r="4" fill="#0B0C1A" stroke="#FF6A3D" stroke-width="2"/>`).join("")}
+      ${months.map((m,i)=>`<text x="${i*(560/Math.max(months.length-1,1))}" y="158" font-size="10" fill="#9A9CC0" text-anchor="middle">${m}</text>`).join("")}
+    </svg>` : `<p style="color:var(--dim)">Not enough dated reviews to plot a trend yet.</p>`}
+  </div>
+  ${data.spike ? `<div class="card" style="margin-top:16px">
+    <div class="section-title"><span class="dot" style="background:var(--neu)"></span>Drift alert</div>
+    <div class="quote" style="border-left-color:var(--neu)"><div class="tag">${data.spike.t}</div>${data.spike.q}</div>
+  </div>` : ""}
+</div>
+
+<div class="view" id="v-search">
+  <input type="text" id="searchBox" placeholder='Search reviews, e.g. "battery", "shipping", "quality"'>
+  <div id="searchResults" style="margin-top:14px"></div>
+</div>
+
+<div class="view" id="v-ingest">
+  <div class="card">
+    <div class="section-title">Analyze from product link</div>
+    <p style="color:var(--dim);font-size:13px;margin-top:0">Currently showing the full 6.8M-review dataset. Paste a product link to switch to that product's own reviews.</p>
+    <input type="text" id="urlBox" placeholder="https://www.amazon.com/dp/B09XS7JWHH or any store/review URL">
+    <div style="margin-top:12px"><button class="btn" id="analyzeBtn">Collect Reviews &amp; Analyze Link</button></div>
+    <div class="sample-row">
+      ${["Sony WH-1000XM5","Anker Soundcore","Kindle Paperwhite","Nike Pegasus","Logitech MX Master","Koss Porta Pro"].map(s=>`<span class="chip">${s}</span>`).join("")}
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <div class="section-title">Upload reviews CSV</div>
+    <p style="color:var(--dim);font-size:13px;margin-top:0">Supported columns: review, rating, date, product.</p>
+    <input type="file" id="csvFile" accept=".csv" style="display:none">
+    <button class="btn ghost" id="uploadBtn">Choose File…</button>
+  </div>
+</div>
+
+<div class="view" id="v-report">
+  <div class="card">
+    <div class="section-title">Executive summary</div>
+    <p style="line-height:1.7;font-size:14px">${isProduct
+      ? `Customers generally praise the ${data.name}'s ${topPraise.toLowerCase()}. Across ${R(data.reviews)} analyzed reviews, overall sentiment is ${data.pos}% positive vs ${data.neg}% negative. The most common friction point is ${topComplaint.toLowerCase()}.`
+      : `Across all 4 categories and ${R(data.reviews)} analyzed reviews, overall customer sentiment is ${data.pos}% positive vs ${data.neg}% negative. The most common friction points dataset-wide are ${topComplaint.toLowerCase()} and ${secondComplaint.toLowerCase()}. Analyze a specific product link for a focused report.`}</p>
+    <button class="btn" id="downloadBtn">Download Report (.txt)</button>
+  </div>
+</div>
+`;
+
+  // search (scoped to current dataset's sample)
+  function renderSearch(q){
+    const list = reviewsSample.filter(r=>!q || (r.t||"").toLowerCase().includes(q.toLowerCase()) || (r.cat||"").toLowerCase().includes(q.toLowerCase()));
+    document.getElementById("searchResults").innerHTML = list.length ? list.map(r=>`
+      <div class="review-row"><div class="meta"><span class="star">${"★".repeat(Math.max(0,Math.min(5,r.r||0)))}${"☆".repeat(5-Math.max(0,Math.min(5,r.r||0)))}</span><span>${r.cat||""}</span></div>${r.t||""}</div>
+    `).join("") : `<p style="color:var(--dim)">No reviews match "${q}".</p>`;
+  }
+  renderSearch("");
+  document.getElementById("searchBox").addEventListener("input", e=>renderSearch(e.target.value));
+
+  document.getElementById("analyzeBtn").onclick=async ()=>{
+    const url = document.getElementById("urlBox").value.trim();
+    if(!url){toast("Enter or pick a product link first.");return;}
+    const btn = document.getElementById("analyzeBtn");
+    btn.disabled = true; btn.textContent = "Analyzing…";
+    try{
+      const res = await fetch("/api/analyze-url", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({url})
+      });
+      const json = await res.json();
+      if(!res.ok) throw new Error(json.error || "Analysis failed");
+      switchTo(json);
+      toast(json.status_message || `Analyzed ${json.name}`);
+    }catch(err){
+      toast(`Couldn't reach the Lumina API (${err.message}). Showing sample data instead.`);
+      switchTo(PRODUCTS.sony);
+    }finally{
+      btn.disabled = false; btn.textContent = "Collect Reviews & Analyze Link";
+    }
+  };
+
+  document.getElementById("uploadBtn").onclick=()=>document.getElementById("csvFile").click();
+  document.getElementById("csvFile").onchange=async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    toast("Uploading & analyzing CSV…");
+    try{
+      const form = new FormData(); form.append("file", file);
+      const res = await fetch("/api/analyze-csv", {method:"POST", body:form});
+      const json = await res.json();
+      if(!res.ok) throw new Error(json.error || "Analysis failed");
+      switchTo(json);
+      toast(`Analyzed ${json.reviews.toLocaleString()} reviews from ${file.name}`);
+    }catch(err){
+      toast(`Couldn't reach the Lumina API (${err.message}).`);
+    }
+  };
+  document.querySelectorAll(".sample-row .chip").forEach(c=>{
+    c.onclick=()=>{
+      const label = (c.textContent || "").trim();
+      document.getElementById("urlBox").value = SAMPLE_URLS[label] || label;
+    };
+  });
+
+  document.getElementById("downloadBtn").onclick=()=>{
+    const text = `LUMINA — Executive Summary\n\n${isProduct?data.name:data.title}\n${R(data.reviews)} reviews analyzed\n${data.pos}% positive / ${data.neg}% negative / ${data.neu}% neutral\nAverage rating: ${data.avgRating ?? "n/a"}\n\nTop complaint: ${topComplaint}\nTop praise: ${topPraise}`;
+    const blob = new Blob([text], {type:"text/plain"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "lumina_report.txt"; a.click();
+  };
+}
+
+function switchTo(data){
+  if (data.mode === "global") liveGlobal = data;
+  state = { mode: data.mode, data };
+  document.getElementById("topTitle").textContent = data.mode==="product" ? data.name : data.title;
+  document.getElementById("topSub").textContent = data.mode==="product" ? data.category : data.sub;
+  document.getElementById("topPill").textContent = `${R(data.reviews)} reviews analyzed`;
+  document.getElementById("backBtn").style.display = data.mode==="product" ? "inline-block" : "none";
+  const activeId = document.querySelector(".view.active")?.id || "v-overview";
+  renderContent(data);
+  showTab(activeId.replace("v-",""));
+  toast(data.mode==="product" ? `Switched to ${data.name}` : "Back to full dataset");
+}
+document.getElementById("backBtn").onclick=()=>switchTo(liveGlobal);
+
+(async function initGlobal(){
+  try{
+    const res = await fetch("/api/global");
+    const json = await res.json();
+    if(!res.ok) throw new Error(json.error || "No global stats yet");
+    switchTo(json);
+  }catch(err){
+    renderContent(GLOBAL); // Lumina API not running / processed/ not built yet — fall back to sample data
+    toast(`Showing sample data — ${err.message}`);
+  }
+})();
+</script>
+</body>
+</html>
