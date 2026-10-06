@@ -2148,17 +2148,18 @@ function buildInitialComparisonData(prod, compName) {
   ];
 
   const attrComps = baseCards.map(c => {
-    const sA = (typeof c.score === 'number') ? c.score : 80;
-    const sB = Math.max(50, Math.min(95, sA - Math.floor(Math.random() * 12) + 2));
-    const delta = sA - sB;
-    const winner = delta > 2 ? prod.name : (delta < -2 ? compName : 'Tied');
+    const isNullC = (c.score === 'N/A' || c.score === null || c.score === undefined || c.status === 'not_applicable');
+    const sA = isNullC ? 'N/A' : ((typeof c.score === 'number') ? c.score : 80);
+    const sB = isNullC ? 'N/A' : Math.max(50, Math.min(95, (typeof sA === 'number' ? sA : 75) - Math.floor(Math.random() * 12) + 2));
+    const delta = (typeof sA === 'number' && typeof sB === 'number') ? (sA - sB) : null;
+    const winner = (delta !== null && delta > 2) ? prod.name : ((delta !== null && delta < -2) ? compName : 'Tied');
     return {
       attribute: c.name,
       score_a: sA,
       score_b: sB,
       delta: delta,
       winner: winner,
-      advantage_text: delta > 2 ? `+${delta} pts lead for ${prod.name}` : (delta < -2 ? `+${Math.abs(delta)} pts lead for ${compName}` : 'Parity / Tied')
+      advantage_text: (delta !== null && delta > 2) ? `+${delta} pts lead for ${prod.name}` : ((delta !== null && delta < -2) ? `+${Math.abs(delta)} pts lead for ${compName}` : 'Parity / Tied')
     };
   });
 
@@ -2327,16 +2328,27 @@ function renderComparisonInner(comp) {
 
       <div style="margin-top:14px;">
         ${(comp.category_attributes || []).map(attr => {
-          const sA = (typeof attr.score_a === 'number') ? attr.score_a : 75;
-          const sB = (typeof attr.score_b === 'number') ? attr.score_b : 70;
-          const aLead = (attr.winner === a.name || (attr.delta && attr.delta > 0));
-          const tied = (attr.winner === 'Tied' || !attr.delta || Math.abs(attr.delta) <= 1.5);
+          const isNullA = attr.score_a === null || attr.score_a === undefined || attr.score_a === 'N/A' || String(attr.score_a).trim().toUpperCase() === 'N/A' || attr.score_a === 'null' || (typeof attr.score_a === 'number' && isNaN(attr.score_a)) || attr.score_a === '';
+          const isNullB = attr.score_b === null || attr.score_b === undefined || attr.score_b === 'N/A' || String(attr.score_b).trim().toUpperCase() === 'N/A' || attr.score_b === 'null' || (typeof attr.score_b === 'number' && isNaN(attr.score_b)) || attr.score_b === '';
+
+          const sA = !isNullA && typeof attr.score_a === 'number' ? attr.score_a : (!isNullA && !isNaN(parseFloat(attr.score_a)) ? parseFloat(attr.score_a) : null);
+          const sB = !isNullB && typeof attr.score_b === 'number' ? attr.score_b : (!isNullB && !isNaN(parseFloat(attr.score_b)) ? parseFloat(attr.score_b) : null);
+
+          const aLead = (!isNullA && !isNullB && (attr.winner === a.name || (attr.delta && attr.delta > 0)));
+          const bLead = (!isNullA && !isNullB && (attr.winner === b.name || (attr.delta && attr.delta < 0)));
+          const tied = (isNullA && isNullB) || attr.winner === 'Tied' || !attr.delta || Math.abs(attr.delta) <= 1.5;
+
+          let advTag = esc(attr.advantage_text || (tied ? 'Parity / Tied' : (aLead ? ('+' + attr.delta + ' pts ' + a.name) : ('+' + Math.abs(attr.delta) + ' pts ' + b.name))));
+          if(isNullA && isNullB){
+            advTag = 'Parity / Tied';
+          }
+
           return `
             <div class="comp-attr-row">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <b style="font-size:11px;color:#edf4ff;">${esc(attr.attribute)}</b>
                 <span class="tag" style="background:${tied ? 'rgba(255,255,255,0.06)' : (aLead ? 'rgba(59,130,246,0.15)' : 'rgba(192,132,252,0.15)')};color:${tied ? 'var(--silver)' : (aLead ? '#93c5fd' : '#d8b4fe')};font-size:9.5px;padding:2px 7px;">
-                  ${esc(attr.advantage_text || (tied ? 'Parity / Tied' : (aLead ? ('+' + attr.delta + ' pts ' + a.name) : ('+' + Math.abs(attr.delta) + ' pts ' + b.name))))}
+                  ${advTag}
                 </span>
               </div>
               
@@ -2346,11 +2358,11 @@ function renderComparisonInner(comp) {
                 <div>
                   <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);margin-bottom:3px;">
                     <span>${esc(a.name)}:</span>
-                    <b style="color:var(--blue);">${attr.score_a} / 100</b>
+                    <b style="color:${isNullA ? 'var(--yellow)' : 'var(--blue)'};">${isNullA ? 'N/A / 100' : (sA + ' / 100')}</b>
                   </div>
                   <div class="comp-attr-bar-wrap" style="margin-top:0;">
                     <div style="flex:1;background:rgba(255,255,255,0.06);height:6px;border-radius:4px;overflow:hidden;">
-                      <div class="comp-attr-bar" style="width:${Math.min(100, Math.max(10, sA))}%;background:linear-gradient(90deg,var(--blue),#60a5fa);"></div>
+                      <div class="comp-attr-bar" style="width:${isNullA ? '25%' : (Math.min(100, Math.max(10, sA)) + '%')};background:${isNullA ? 'linear-gradient(90deg, #eab308, #facc15)' : 'linear-gradient(90deg,var(--blue),#60a5fa)'};box-shadow:${isNullA ? '0 0 6px rgba(234, 179, 8, 0.35)' : 'none'};"></div>
                     </div>
                   </div>
                 </div>
@@ -2359,11 +2371,11 @@ function renderComparisonInner(comp) {
                 <div>
                   <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);margin-bottom:3px;">
                     <span>${esc(b.name)}:</span>
-                    <b style="color:#c084fc;">${attr.score_b} / 100</b>
+                    <b style="color:${isNullB ? 'var(--yellow)' : '#c084fc'};">${isNullB ? 'N/A / 100' : (sB + ' / 100')}</b>
                   </div>
                   <div class="comp-attr-bar-wrap" style="margin-top:0;">
                     <div style="flex:1;background:rgba(255,255,255,0.06);height:6px;border-radius:4px;overflow:hidden;">
-                      <div class="comp-attr-bar" style="width:${Math.min(100, Math.max(10, sB))}%;background:linear-gradient(90deg,#9333ea,#c084fc);"></div>
+                      <div class="comp-attr-bar" style="width:${isNullB ? '25%' : (Math.min(100, Math.max(10, sB)) + '%')};background:${isNullB ? 'linear-gradient(90deg, #eab308, #facc15)' : 'linear-gradient(90deg,#9333ea,#c084fc)'};box-shadow:${isNullB ? '0 0 6px rgba(234, 179, 8, 0.35)' : 'none'};"></div>
                     </div>
                   </div>
                 </div>
@@ -4779,10 +4791,11 @@ function applyAnalyzedPayload(d){
       let barFill = `${Math.min(100, Math.max(0, typeof c.score === 'number' ? c.score : 0))}%`;
       let barGradient = 'linear-gradient(90deg, #3b82f6, #10b981)';
 
-      if(isNA){
-        scoreColor = 'var(--muted)';
-        scoreDisplay = '<span style="font-size:14px;color:var(--muted);font-weight:600">N/A</span>';
-        barFill = '0%';
+      if(isNA || c.score === null || c.score === undefined){
+        scoreColor = 'var(--yellow)';
+        scoreDisplay = '<span style="font-size:14px;color:var(--yellow);font-weight:600">N/A</span>';
+        barFill = '20%';
+        barGradient = 'linear-gradient(90deg, #eab308, #facc15)';
       } else if(isSparse){
         scoreColor = 'var(--yellow)';
         scoreDisplay = '<span style="font-size:12px;color:var(--yellow);font-weight:600">Sparse</span>';
