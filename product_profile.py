@@ -10,9 +10,36 @@ from __future__ import annotations
 import re
 from typing import Any
 import pandas as pd
+from lumina_config import detect_product_category, get_category_info
 
 # Detailed specification profiles for benchmark and dataset products
 KNOWN_PRODUCT_PROFILES: dict[str, dict[str, Any]] = {
+    "Sony WH-1000XM5 Wireless Noise-Canceling Headphones": {
+        "name": "Sony WH-1000XM5 Wireless Noise-Canceling Headphones",
+        "brand": "Sony",
+        "model": "WH-1000XM5",
+        "asin": "B09XS7JWHH",
+        "category": "Electronics · Audio / Premium ANC Headphones",
+        "image": "https://m.media-amazon.com/images/I/61+elLndqVL._AC_SL1500_.jpg",
+        "tagline": "Industry-leading active noise canceling headphones with Auto NC Optimizer, 30mm precision drivers, and 30-hour battery life.",
+        "description": "The Sony WH-1000XM5 wireless noise-canceling headphones set a new standard for distraction-free listening and exceptional calling clarity. Equipped with two processors controlling eight microphones, an Auto NC Optimizer for automatically optimizing noise canceling based on wearing conditions and environment, and a specially designed 30mm driver unit.",
+        "functions": [
+            "Industry-Leading Noise Cancellation: Two processors control 8 microphones for unprecedented noise cancellation.",
+            "Magnificent Sound Engineering: Specially designed 30mm driver unit with carbon fiber composite TPU edge.",
+            "Crystal-Clear Hands-Free Calling: 4 beamforming microphones with AI-based noise reduction algorithms.",
+            "Multipoint Device Connection: Seamlessly switch between two Bluetooth devices simultaneously.",
+        ],
+        "specs": {
+            "Form Factor": "Over-Ear, Closed Back",
+            "Weight": "250 grams (8.8 oz)",
+            "Power / Battery": "Up to 30 hours (ANC On) / 40 hours (ANC Off)",
+            "Charging": "USB-C Quick Charge (3 min = 3 hours playback)",
+            "Connectivity": "Bluetooth 5.2 (LDAC, AAC, SBC), 3.5mm Aux",
+            "Drivers": "30mm dome type carbon fiber composite",
+            "Microphones": "8 microphones with AI beamforming",
+        },
+        "target_audience": "Frequent flyers, remote professionals, commuters, and audiophiles seeking premier noise isolation.",
+    },
     "Koss Porta Pro Classic Headphones (B00004T8R2)": {
         "name": "Koss Porta Pro Classic On-Ear Portable Headphones",
         "brand": "Koss",
@@ -135,6 +162,7 @@ KNOWN_PRODUCT_PROFILES: dict[str, dict[str, Any]] = {
         "brand": "Sony",
         "model": "WH-1000XM5",
         "asin": "B09XS7JWHH",
+        "price": "$399.99 (MSRP)",
         "category": "Electronics · Audio / Premium Wireless Headphones",
         "tagline": "Industry-leading active noise cancellation with 8 microphones, 30-hour battery, and Hi-Res wireless audio.",
         "functions": [
@@ -472,6 +500,10 @@ def extract_product_profile(
             if key.lower() in prod_clean.lower() or prod_clean.lower() in key.lower():
                 matched_prof = dict(prof)
                 break
+            model = prof.get("model", "").lower()
+            if model and model in prod_clean.lower():
+                matched_prof = dict(prof)
+                break
             if prof.get("asin") and prof["asin"].lower() in prod_clean.lower():
                 matched_prof = dict(prof)
                 break
@@ -497,59 +529,169 @@ def extract_product_profile(
     # 2. Dynamic Extraction from reviews, metadata and URL info
     inferred_brand = "Generic / OEM"
     inferred_model = prod_clean
-    inferred_category = "Consumer Goods"
+
+    # Detect category using 3-tier taxonomy engine
+    # Detect category using category_intelligence classification engine
+    from category_intelligence import classify_product
+    primary_cat, cat_conf, _ = classify_product(
+        title=prod_clean,
+        reviews_df=reviews_df,
+        metadata={"category": url_info.get("category") if url_info else None}
+    )
+    inferred_category = primary_cat
 
     # Extract brand from product title
     words = prod_clean.split()
     if words:
         first_word = words[0]
-        if first_word.lower() in ["sony", "anker", "nike", "asics", "apple", "samsung", "logitech", "koss", "bose", "kindle"]:
+        if first_word.lower() in ["sony", "anker", "nike", "asics", "apple", "samsung", "logitech", "koss", "bose", "kindle", "adidas", "zara", "h&m", "levis", "puma"]:
             inferred_brand = first_word.capitalize()
 
     detected_functions = []
     detected_specs = {
         "Product Title": prod_clean,
         "Identified Model / SKU": prod_clean.split("(")[-1].replace(")", "").strip() if "(" in prod_clean else "Standard Edition",
-        "Form Factor": "Hardware Device / Consumer Product",
-        "Materials & Build": "Synthetic composite & standard enclosure",
-        "Fit / Ergonomics": "Ergonomic consumer design",
+        "Evaluated Category": primary_cat,
+        "Detection Source": f"Category Intelligence ({int(cat_conf*100)}% confidence)",
     }
 
-    if reviews_df is not None and not reviews_df.empty:
-        all_text = " ".join(reviews_df["review"].astype(str).tolist()[:100]).lower()
+    # Category-specific baseline specs & functions across all 10 primary categories
+    if primary_cat == "Clothing / Apparel":
+        detected_specs.update({
+            "Form Factor": "Apparel / Garment (T-Shirt, Top, Outerwear)",
+            "Materials & Fabric": "Breathable textile knit & reinforced weave",
+            "Fit & Sizing": "Standard regular cut with ergonomic drape",
+            "Wash Care & Shrinkage": "Machine wash cold with like colors, tumble dry low",
+            "Seam Construction": "Double-needle sleeve and hem stitching",
+        })
+        detected_functions.extend([
+            "Garment Comfort & Drape: Tailored cut providing natural mobility, breathable air circulation, and soft next-to-skin touch.",
+            "Fabric Integrity & Colorfastness: Colorfast dyed yarn designed to prevent fading and seam warping across repeated washes.",
+            "Moisture Management: Open textile weave promoting body heat dissipation during daily wear.",
+        ])
+    elif primary_cat == "Footwear":
+        detected_specs.update({
+            "Form Factor": "Athletic / Lifestyle Footwear",
+            "Midsole & Cushioning": "Dual-density EVA foam midsole with heel impact dampening",
+            "Outsole & Traction": "Multi-surface non-marking rubber tread",
+            "Fit & Arch Profile": "Contoured anatomical footbed with reinforced arch bridge",
+        })
+        detected_functions.extend([
+            "Impact Shock Absorption: Responsive sole cushioning dispersing vertical ground reaction force.",
+            "Multi-Surface Traction: Engineered outsole grooves delivering slip-resistant grip on wet and dry surfaces.",
+            "Anatomical Arch Support: Stabilizing cup structure designed to relieve plantar fatigue during extended standing.",
+        ])
+    elif primary_cat == "Electronics":
+        detected_specs.update({
+            "Form Factor": "Digital Tech Hardware / Electronic Device",
+            "Chassis & Build": "Engineered composite / alloy housing",
+            "Performance": "High-throughput responsive digital circuitry",
+        })
+        detected_functions.extend([
+            "Digital Signal Processing: Low-latency circuitry delivering responsive performance.",
+            "System Reliability: Stable operational firmware with predictable hardware handshake.",
+        ])
+    elif primary_cat == "Jewelry":
+        detected_specs.update({
+            "Form Factor": "Fine / Fashion Jewelry Piece",
+            "Finish & Polish": "High-luster surface finish with protective anti-scratch coating",
+            "Clasp & Setting": "Precision prong setting and secure tension clasp",
+            "Skin Safety": "Hypoallergenic contact surface designed to prevent skin discoloration",
+        })
+        detected_functions.extend([
+            "Luster & Brilliance: Surface polish reflecting light with refined clarity and shine.",
+            "Tarnish Resistance: Protective atmospheric seal resisting environmental oxidation.",
+            "Secure Retention: Reinforced clasp and prongs preventing accidental loss during daily wear.",
+        ])
+    elif primary_cat == "Furniture":
+        detected_specs.update({
+            "Form Factor": "Residential / Commercial Furniture",
+            "Frame & Structure": "Reinforced structural frame with balanced weight distribution",
+            "Assembly": "Modular assembly with included precision hardware",
+            "Stability & Feet": "Anti-wobble leveling glides protecting flooring",
+        })
+        detected_functions.extend([
+            "Structural Load Support: Heavy-duty frame engineered for continuous weight support without sagging.",
+            "Ergonomic Living Comfort: Optimized contouring and support posture for extended daily use.",
+            "Surface Finish Durability: Scratch-resistant protective coating resisting daily abrasion.",
+        ])
+    elif primary_cat == "Beauty / Personal Care":
+        detected_specs.update({
+            "Form Factor": "Topical Cosmetic / Skincare Formulation",
+            "Skin Compatibility": "Dermatologist-evaluated, gentle topical formulation",
+            "Dispenser Type": "Airtight pump / hygienic protective seal",
+        })
+        detected_functions.extend([
+            "Targeted Treatment & Hydration: Rapidly absorbing formulation reinforcing barrier health.",
+            "Gentle Daily Compatibility: Non-irritating ingredients balanced for frequent application.",
+        ])
+    elif primary_cat == "Bags & Accessories":
+        detected_specs.update({
+            "Form Factor": "Luggage / Everyday Carry Bag",
+            "Material & Shell": "Durable high-denier textile / synthetic composite shell",
+            "Zippers & Hardware": "Heavy-duty smooth-glide zippers and reinforced metal buckles",
+            "Organization": "Dedicated compartments with padded protective sleeves",
+        })
+        detected_functions.extend([
+            "Load Bearing Carry: Ergonomic strap geometry distributing pack weight evenly.",
+            "Internal Organization: Divided partitions and quick-access utility pockets.",
+            "Abrasion & Tear Resistance: Reinforced base and stress-point bar-tacking.",
+        ])
+    elif primary_cat == "Sports & Fitness":
+        detected_specs.update({
+            "Form Factor": "Athletic & Fitness Training Equipment",
+            "Build & Material": "Heavy-gauge steel / high-density impact-resistant composite",
+            "Safety & Grip": "Non-slip knurled grip and positive locking mechanism",
+        })
+        detected_functions.extend([
+            "Training Performance: Consistent resistance curve and smooth mechanical movement.",
+            "Safety & Stability: Secure footing and lock pins preventing workout accidents.",
+        ])
+    elif primary_cat == "Home & Kitchen":
+        detected_specs.update({
+            "Form Factor": "Culinary Appliance / Home Essential",
+            "Food-Contact Safety": "100% BPA-free, food-grade materials & non-stick coating",
+            "Cleaning & Maintenance": "Easy-clean surface with dishwasher-safe removable components",
+        })
+        detected_functions.extend([
+            "Precision Culinary Processing: Calibrated mechanisms delivering uniform preparation.",
+            "Effortless Maintenance: Non-stick surfaces preventing food residue adhesion for easy wipe-down.",
+        ])
+    else:
+        detected_specs.update({
+            "Form Factor": "Consumer Product / Daily Essential",
+            "Materials & Build": "Durable composite and standard housing",
+            "Fit / Ergonomics": "Ergonomic consumer design",
+        })
+        detected_functions.extend([
+            "Core Product Utility: Reliable day-to-day operation fulfilling consumer functional demands.",
+            "Everyday Durability: Built to withstand standard wear and tear over extended lifecycle.",
+        ])
 
-        # Category inference
-        if any(w in all_text for w in ["headphone", "sound", "ear", "bass", "audio", "mic"]):
-            inferred_category = "Electronics · Audio / Headphones"
-            detected_specs["Form Factor"] = "Over-Ear / In-Ear Audio Device"
-            detected_functions.append("Acoustic Sound Reproduction: High-fidelity audio drivers delivering clear treble and bass response.")
-        elif any(w in all_text for w in ["shoe", "walk", "sole", "run", "comfort", "arch", "fit"]):
-            inferred_category = "Footwear · Athletic / Casual Shoes"
-            detected_specs["Form Factor"] = "Athletic Footwear"
-            detected_functions.append("Impact Shock Cushioning: Foam midsole designed for foot cushioning and walking support.")
-        elif any(w in all_text for w in ["battery", "charge", "charger", "power", "watt"]):
-            inferred_category = "Electronics · Mobile Power / Charging"
-            detected_specs["Form Factor"] = "Portable Power Accessory"
-            detected_functions.append("Rapid Power Delivery: High-efficiency energy storage and multi-device fast charging.")
+    if reviews_df is not None and not reviews_df.empty:
+        rev_col = "review" if "review" in reviews_df.columns else reviews_df.columns[0]
+        reviews_corpus = reviews_df[rev_col].dropna().astype(str).tolist()
+        all_text = " ".join(reviews_corpus).lower()
 
         # Features detection
         if "bluetooth" in all_text or "wireless" in all_text:
-            detected_functions.append("Wireless Connectivity: Bluetooth wireless protocol for cable-free pairing.")
+            if not any("bluetooth" in f.lower() for f in detected_functions):
+                detected_functions.append("Wireless Connectivity: Bluetooth wireless protocol for cable-free pairing.")
             detected_specs["Connectivity"] = "Bluetooth Wireless"
         if "noise cancel" in all_text or "anc" in all_text:
-            detected_functions.append("Active Noise Cancellation: Acoustic microphone cancellation of ambient environmental noise.")
+            if not any("noise cancel" in f.lower() for f in detected_functions):
+                detected_functions.append("Active Noise Cancellation: Acoustic microphone cancellation of ambient environmental noise.")
         if "waterproof" in all_text or "water resistant" in all_text:
             detected_functions.append("Water Resistance: Sealed enclosure protecting against moisture and perspiration.")
         if "usb-c" in all_text or "type c" in all_text:
-            detected_specs["Connectivity / Port"] = "USB-C Port"
+            detected_specs["Charging / Interface"] = "USB-C Port"
 
         # Sizing observations
         if "runs small" in all_text:
             detected_specs["Sizing Note"] = "Customer feedback indicates product runs slightly small; consider ordering half size up."
         elif "runs large" in all_text:
             detected_specs["Sizing Note"] = "Customer feedback indicates product runs slightly large."
-        else:
-            detected_specs["Sizing Note"] = "Standard consumer sizing profile."
+
 
     inferred_desc = f"Comprehensive product overview and customer intelligence profile for {prod_clean}. Categorized under {inferred_category}. Engineered for high reliability, performance, and everyday consumer satisfaction."
     inferred_img = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80"
@@ -583,7 +725,7 @@ def extract_product_profile(
         "name": prod_clean,
         "brand": inferred_brand,
         "model": detected_specs.get("Identified Model / SKU", prod_clean),
-        "asin": url_info.get("asin") or detected_specs.get("ASIN", "Extracted via review corpus"),
+        "asin": (url_info.get("asin") if url_info else None) or detected_specs.get("ASIN", "Extracted via review corpus"),
         "category": inferred_category,
         "price": url_info.get("price") if url_info else None,
         "tagline": f"Comprehensive customer feedback analysis for {prod_clean}.",

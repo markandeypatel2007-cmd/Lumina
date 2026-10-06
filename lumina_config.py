@@ -475,3 +475,569 @@ def count_phrases(texts: Iterable[str], phrase_groups: list[tuple[str, list[str]
         })
     rows.sort(key=lambda r: r["count"], reverse=True)
     return rows
+
+
+# =========================================================
+# DYNAMIC CATEGORY TAXONOMY & ATTRIBUTE EVALUATION SYSTEM
+# =========================================================
+
+CATEGORY_TAXONOMY: dict[str, dict] = {
+    "audio_headphones": {
+        "key": "audio_headphones",
+        "name": "Audio & Headphones",
+        "icon": "🎧",
+        "description": "Headphones, earbuds, speakers, headsets, soundbars, and acoustic hardware.",
+        "detection_keywords": [
+            "headphone", "headphones", "earphone", "earphones", "earbuds", "earbud",
+            "soundbar", "speaker", "speakers", "audio", "headset", "earpiece", "in-ear",
+            "over-ear", "on-ear", "anc", "subwoofer", "wh-1000", "airpods", "iem", "tws",
+            "acoustic", "drivers", "ear tips", "headband"
+        ],
+        "attributes": [
+            "Sound Quality & Bass",
+            "Comfort & Ergonomics",
+            "Battery & Charging",
+            "Connectivity & Bluetooth",
+            "Noise Cancellation (ANC)",
+            "Microphone & Calls",
+            "Build & Durability",
+            "Price & Value",
+        ],
+        "attribute_lexicons": {
+            "Sound Quality & Bass": [
+                "sound quality", "audio quality", "bass", "treble", "vocals", "clarity",
+                "crisp sound", "distortion", "muddy", "tinny", "low volume", "loud", "soundstage", "mids"
+            ],
+            "Comfort & Ergonomics": [
+                "comfortable", "comfort", "hurts ears", "ear pain", "ear cups", "headband",
+                "clamp force", "ear tips", "lightweight", "heavy on head", "fatigue", "ear cushion"
+            ],
+            "Battery & Charging": [
+                "battery", "battery life", "charging", "charger", "usb-c", "battery drain",
+                "dies quickly", "playtime", "fast charge", "battery lasts", "case battery"
+            ],
+            "Connectivity & Bluetooth": [
+                "bluetooth", "pairing", "connect", "disconnects", "cutting out", "dropouts",
+                "latency", "audio lag", "multipoint", "range", "reconnect", "signal"
+            ],
+            "Noise Cancellation (ANC)": [
+                "noise cancellation", "anc", "noise cancelling", "ambient mode", "transparency",
+                "blocks noise", "wind noise", "isolation", "background noise"
+            ],
+            "Microphone & Calls": [
+                "microphone", "mic", "call quality", "phone calls", "voice clarity", "muffled mic",
+                "recipient couldn't hear", "mic cuts out"
+            ],
+            "Build & Durability": [
+                "build quality", "hinge", "cracked", "snapped", "plastic", "sturdy", "durable",
+                "feels premium", "feels cheap", "materials", "wear and tear"
+            ],
+            "Price & Value": [
+                "price", "cost", "expensive", "good value", "worth it", "overpriced", "affordable", "deal"
+            ],
+        },
+        "complaint_phrases": [
+            ("Connectivity dropouts", ["disconnects", "connection drops", "cutting out", "bluetooth issue", "won't pair", "pairing issue"]),
+            ("Ear fatigue / tight clamp", ["hurts ears", "too tight", "headband clamp", "ear pain", "uncomfortable"]),
+            ("Rapid battery drain", ["battery dies", "drains quickly", "poor battery", "doesn't last", "battery life is short"]),
+            ("ANC hiss or weak isolation", ["anc is weak", "wind noise", "hissing sound", "doesn't block noise", "weak noise cancellation"]),
+        ],
+        "praise_phrases": [
+            ("Acoustic clarity & deep bass", ["great sound", "crisp audio", "punchy bass", "clear vocals", "amazing sound", "sound quality"]),
+            ("All-day listening comfort", ["very comfortable", "lightweight", "soft ear cushions", "no ear fatigue", "fits well"]),
+            ("Seamless device pairing", ["paired instantly", "multipoint works great", "reliable bluetooth", "easy to connect"]),
+            ("Long-lasting battery life", ["battery lasts days", "quick charge", "impressive battery life", "long battery"]),
+        ],
+    },
+    "apparel_clothing": {
+        "key": "apparel_clothing",
+        "name": "Apparel & Clothing",
+        "icon": "👕",
+        "description": "T-shirts, shirts, hoodies, jackets, pants, dresses, sportswear, and fashion apparel.",
+        "detection_keywords": [
+            "shirt", "t-shirt", "tshirt", "tee", "hoodie", "jacket", "pants", "trousers", "jeans",
+            "dress", "cotton", "polyester", "fabric", "cloth", "garment", "wear", "apparel",
+            "sweater", "shorts", "sweatshirt", "top", "sleeve", "collar", "underwear", "boxer",
+            "knit", "fleece", "crewneck", "v-neck"
+        ],
+        "attributes": [
+            "Fabric & Material Quality",
+            "Fit & Sizing Accuracy",
+            "Comfort & Breathability",
+            "Stitching & Seam Durability",
+            "Wash Care & Shrinkage",
+            "Color & Visual Style",
+            "Price & Value",
+            "Packaging & Delivery",
+        ],
+        "attribute_lexicons": {
+            "Fabric & Material Quality": [
+                "fabric", "material", "cotton", "polyester", "linen", "thin fabric", "thick material",
+                "see through", "feels cheap", "high quality cloth", "soft material", "rough fabric", "breathable", "pure cotton"
+            ],
+            "Fit & Sizing Accuracy": [
+                "fit", "sizing", "size", "runs small", "runs large", "true to size", "too tight", "too loose",
+                "baggy", "length", "sleeves", "shoulder fit", "chest fit", "slim fit", "boxy", "size chart"
+            ],
+            "Comfort & Breathability": [
+                "comfortable", "comfort", "soft on skin", "itchy", "scratchy", "breathable", "sweaty",
+                "lightweight", "cozy", "tagless", "skin irritation", "feels good"
+            ],
+            "Stitching & Seam Durability": [
+                "stitching", "stitch", "seam", "seams", "loose threads", "hem", "ripped", "tore", "hole",
+                "tear", "unraveled", "durable", "sturdy stitching"
+            ],
+            "Wash Care & Shrinkage": [
+                "shrink", "shrunk", "shrank", "after wash", "dryer", "wash cycle", "bleeding color",
+                "color faded after wash", "wrinkles", "hand wash", "machine wash", "pilling", "lint"
+            ],
+            "Color & Visual Style": [
+                "color", "colour", "shade", "print", "graphic", "faded", "looks like picture",
+                "vibrant", "dull color", "stylish", "pattern", "design", "look"
+            ],
+            "Price & Value": [
+                "price", "cost", "good value", "worth the money", "cheap quality", "overpriced",
+                "affordable", "great value for money", "bargain"
+            ],
+            "Packaging & Delivery": [
+                "packaging", "shipping", "delivery", "arrived on time", "fast shipping", "sealed package", "wrinkled in package"
+            ],
+        },
+        "complaint_phrases": [
+            ("Shrunk significantly after washing", ["shrunk", "shrank in wash", "shrunk in dryer", "unwearable after wash", "shrinkage"]),
+            ("Inaccurate sizing (runs small/tight)", ["runs small", "runs very small", "size chart inaccurate", "too tight", "too short"]),
+            ("Loose threads & weak seams", ["loose threads", "seam came undone", "stitching ripped", "unraveled", "poor stitching"]),
+            ("Thin or see-through fabric", ["very thin", "see through", "cheap fabric", "rough material", "scratchy", "low quality cloth"]),
+        ],
+        "praise_phrases": [
+            ("Ultra-soft & comfortable fabric", ["super soft", "great fabric", "feels amazing on skin", "breathable cotton", "comfortable"]),
+            ("True to size & flattering fit", ["fits perfectly", "true to size", "great fit", "flattering cut", "fits as expected"]),
+            ("Maintains shape & color after wash", ["didn't shrink", "washed well", "colors stay vibrant", "no fading", "holds shape"]),
+            ("Great quality for the price", ["great value", "worth the price", "affordable price", "worth every penny"]),
+        ],
+    },
+    "footwear_shoes": {
+        "key": "footwear_shoes",
+        "name": "Footwear & Shoes",
+        "icon": "👟",
+        "description": "Sneakers, running shoes, athletic footwear, boots, sandals, and formal shoes.",
+        "detection_keywords": [
+            "shoe", "shoes", "sneaker", "sneakers", "boot", "boots", "sandal", "sandals",
+            "footwear", "running shoe", "heel", "sole", "insole", "arch support", "cleats", "loafer",
+            "outsole", "slippers", "clogs"
+        ],
+        "attributes": [
+            "Cushioning & Underfoot Comfort",
+            "Fit & Width Sizing",
+            "Traction & Outsole Grip",
+            "Durability & Sole Integrity",
+            "Breathability & Temperature",
+            "Style & Aesthetics",
+            "Price & Value",
+            "Packaging & Delivery",
+        ],
+        "attribute_lexicons": {
+            "Cushioning & Underfoot Comfort": [
+                "cushion", "cushioning", "comfortable", "insole", "midsole", "arch support", "heel pain",
+                "blister", "walking all day", "standing all day", "cloud", "shock absorption", "foot pain"
+            ],
+            "Fit & Width Sizing": [
+                "fit", "size", "sizing", "true to size", "toe box", "narrow", "wide feet", "tight toe",
+                "half size small", "half size large", "heel slip", "snug fit"
+            ],
+            "Traction & Outsole Grip": [
+                "traction", "grip", "slippery", "slip resistant", "outsole", "rubber sole", "wet surfaces",
+                "skid", "non-slip", "tread"
+            ],
+            "Durability & Sole Integrity": [
+                "durability", "sole detached", "glue peeling", "tread wore off", "ripped mesh",
+                "fell apart", "long lasting", "sturdy", "holds up", "broke down"
+            ],
+            "Breathability & Temperature": [
+                "breathable", "mesh", "sweaty feet", "hot feet", "air circulation", "lightweight", "heavy shoe"
+            ],
+            "Style & Aesthetics": [
+                "looks great", "stylish", "design", "colorway", "appearance", "sleek", "compliments"
+            ],
+            "Price & Value": [
+                "price", "worth the money", "expensive", "affordable", "overpriced", "good value"
+            ],
+            "Packaging & Delivery": [
+                "box", "shoebox crushed", "delivery", "shipping", "fast arrival"
+            ],
+        },
+        "complaint_phrases": [
+            ("Sole detached or wore out quickly", ["sole separated", "sole fell off", "tread wore down", "glue coming apart", "sole broke"]),
+            ("Blisters & heel rubbing", ["gave me blisters", "rubs heel", "painful to walk", "stiff heel counter", "blister"]),
+            ("Narrow / cramped toe box", ["too narrow", "cramped toes", "pinches foot", "runs half size small", "toe box tight"]),
+            ("Slippery on wet ground", ["no grip", "slippery on wet", "slid on tile", "poor traction", "slippery"]),
+        ],
+        "praise_phrases": [
+            ("All-day walking comfort", ["walk all day", "like walking on clouds", "great arch support", "zero foot pain", "comfortable"]),
+            ("Solid grip & stable traction", ["excellent grip", "solid traction", "stable rubber outsole", "non-slip"]),
+            ("Perfect true-to-size fit", ["fits like a glove", "true to size", "plenty of toe room", "fits well"]),
+            ("Stylish design & compliments", ["looks great", "stylish sneaker", "get compliments", "sharp look"]),
+        ],
+    },
+    "electronics_computing": {
+        "key": "electronics_computing",
+        "name": "Electronics & Computing",
+        "icon": "💻",
+        "description": "Laptops, smartphones, tablets, monitors, smartwatches, computer components, and office tech.",
+        "detection_keywords": [
+            "laptop", "computer", "notebook", "pc", "macbook", "smartphone", "phone", "tablet",
+            "ipad", "monitor", "screen", "keyboard", "mouse", "gpu", "cpu", "processor", "ram",
+            "smartwatch", "desktop", "charger", "power bank", "gadget"
+        ],
+        "attributes": [
+            "Display & Screen Quality",
+            "Performance & Processing Speed",
+            "Battery Life & Thermals",
+            "Build Quality & Chassis",
+            "Software & Operating System",
+            "Ports & Connectivity",
+            "Price & Value",
+        ],
+        "attribute_lexicons": {
+            "Display & Screen Quality": [
+                "display", "screen", "resolution", "colors", "brightness", "refresh rate", "oled", "pixel", "glare", "viewing angle"
+            ],
+            "Performance & Processing Speed": [
+                "speed", "fast", "lag", "freezes", "snappy", "multitasking", "gaming", "ram", "processor", "boot time", "slow"
+            ],
+            "Battery Life & Thermals": [
+                "battery", "battery life", "overheating", "hot", "fan noise", "charger", "fast charging", "battery drain", "thermals"
+            ],
+            "Build Quality & Chassis": [
+                "build quality", "metal chassis", "plastic feel", "hinge", "keyboard feel", "trackpad", "sturdy", "premium feel"
+            ],
+            "Software & Operating System": [
+                "software", "os", "windows", "macos", "android", "bloatware", "crashes", "bugs", "glitches", "updates"
+            ],
+            "Ports & Connectivity": [
+                "wifi", "bluetooth", "ports", "usb-c", "hdmi", "webcam", "speakers", "dongle", "connectivity"
+            ],
+            "Price & Value": [
+                "price", "specs for the price", "value", "expensive", "affordable", "overpriced", "worth it"
+            ],
+        },
+        "complaint_phrases": [
+            ("Thermal throttling / fan noise", ["overheating", "gets very hot", "loud fan", "fan constantly running", "hot to touch"]),
+            ("System freezes or software lag", ["freezes", "lags", "sluggish", "slow performance", "crashed"]),
+            ("Disappointing battery endurance", ["battery dies fast", "poor battery life", "must stay plugged in", "short battery"]),
+            ("Chassis / hinge build defects", ["broken hinge", "flimsy build", "cheap plastic feel", "trackpad rattle"]),
+        ],
+        "praise_phrases": [
+            ("Blazing fast & smooth performance", ["blazing fast", "very fast", "snappy performance", "handles heavy load", "smooth"]),
+            ("Vibrant, high-resolution screen", ["gorgeous display", "crisp screen", "bright display", "vibrant colors"]),
+            ("Solid premium aluminum chassis", ["premium build", "solid metal chassis", "well built", "sturdy"]),
+            ("All-day battery efficiency", ["all day battery", "great battery life", "lasts entire work day"]),
+        ],
+    },
+    "home_kitchen": {
+        "key": "home_kitchen",
+        "name": "Home & Kitchen Appliances",
+        "icon": "🍳",
+        "description": "Air fryers, blenders, coffee makers, vacuum cleaners, microwaves, cookware, and home goods.",
+        "detection_keywords": [
+            "fryer", "air fryer", "blender", "coffee", "vacuum", "cookware", "pan", "pot", "kitchen",
+            "appliance", "microwave", "toaster", "kettle", "knife", "grill", "refrigerator", "oven",
+            "cooker", "dishwasher", "mixer"
+        ],
+        "attributes": [
+            "Cooking & Performance",
+            "Ease of Cleaning",
+            "Controls & Ease of Use",
+            "Noise Level & Operation",
+            "Build Quality & Durability",
+            "Size & Countertop Footprint",
+            "Price & Value",
+        ],
+        "attribute_lexicons": {
+            "Cooking & Performance": [
+                "cooking", "cooks evenly", "crispy", "heating", "blends smoothly", "suction power", "works fast", "temperature", "power"
+            ],
+            "Ease of Cleaning": [
+                "easy to clean", "cleaning", "dishwasher safe", "non-stick", "residue", "hard to clean", "grease", "wipes down"
+            ],
+            "Controls & Ease of Use": [
+                "easy to use", "simple controls", "presets", "digital display", "buttons", "intuitive", "instructions", "timer"
+            ],
+            "Noise Level & Operation": [
+                "noise", "loud", "quiet", "motor noise", "humming", "rattling", "quiet motor", "silent"
+            ],
+            "Build Quality & Durability": [
+                "build quality", "sturdy", "durable", "broke after months", "plastic smell", "smoke", "leaks", "well built"
+            ],
+            "Size & Countertop Footprint": [
+                "size", "capacity", "counter space", "compact", "bulky", "fits on counter", "basket size", "fits easily"
+            ],
+            "Price & Value": [
+                "price", "worth the money", "saves time", "expensive", "affordable", "overpriced", "good value"
+            ],
+        },
+        "complaint_phrases": [
+            ("Difficult to clean / coating peeled", ["hard to clean", "coating peeled", "food sticks", "hand wash only", "burnt on residue"]),
+            ("Loud or vibrating motor noise", ["extremely loud", "loud motor", "rattling noise", "unbearable sound"]),
+            ("Stopped heating or working early", ["stopped heating", "died after a month", "quit working", "element broke", "defective"]),
+            ("Strong burning plastic odor", ["plastic smell", "burnt odor", "smoke came out", "chemical smell"]),
+        ],
+        "praise_phrases": [
+            ("Cooks evenly & crisps food perfectly", ["cooks evenly", "crispy results", "delicious food", "heats quickly", "works amazing"]),
+            ("Effortless non-stick cleaning", ["so easy to clean", "dishwasher safe", "wipes clean in seconds", "non stick works great"]),
+            ("Intuitive one-touch controls", ["easy to use", "simple presets", "intuitive buttons", "clear digital display"]),
+            ("Saves time & kitchen countertop space", ["saves time", "compact footprint", "fits counter nicely", "daily essential"]),
+        ],
+    },
+    "beauty_personal_care": {
+        "key": "beauty_personal_care",
+        "name": "Beauty & Personal Care",
+        "icon": "✨",
+        "description": "Skincare, moisturizers, serums, shampoos, cosmetics, perfumes, and grooming items.",
+        "detection_keywords": [
+            "skin", "skincare", "cream", "lotion", "serum", "moisturizer", "shampoo", "conditioner",
+            "soap", "face wash", "makeup", "cosmetics", "sunscreen", "perfume", "fragrance", "cleanser",
+            "oil", "acne", "hair", "lipstick"
+        ],
+        "attributes": [
+            "Effectiveness & Visible Results",
+            "Skin Tolerance & Safety",
+            "Texture & Absorption",
+            "Fragrance & Scent",
+            "Packaging & Dispenser",
+            "Price & Value",
+        ],
+        "attribute_lexicons": {
+            "Effectiveness & Visible Results": [
+                "results", "effective", "hydrating", "glowing skin", "cleared acne", "wrinkles", "soft skin", "moisturized", "visible difference"
+            ],
+            "Skin Tolerance & Safety": [
+                "breakout", "irritation", "burning", "allergic reaction", "redness", "gentle", "sensitive skin", "safe", "rash"
+            ],
+            "Texture & Absorption": [
+                "texture", "absorbs quickly", "lightweight", "non-greasy", "sticky", "oily residue", "thick cream", "smooth finish"
+            ],
+            "Fragrance & Scent": [
+                "fragrance", "scent", "smells good", "strong perfume", "unscented", "chemical smell", "pleasant smell", "odor"
+            ],
+            "Packaging & Dispenser": [
+                "pump", "bottle", "leaks", "dropper", "dispenser", "sealed", "easy to apply", "jar", "packaging"
+            ],
+            "Price & Value": [
+                "price", "bottle lasted", "expensive", "affordable", "worth the price", "good value for size"
+            ],
+        },
+        "complaint_phrases": [
+            ("Caused skin breakout / irritation", ["caused breakout", "irritated skin", "burning sensation", "redness", "broke me out"]),
+            ("Greasy or sticky residue", ["too greasy", "sticky feeling", "heavy on skin", "leaves oily film", "doesn't absorb"]),
+            ("Overwhelming chemical fragrance", ["too strong scent", "artificial perfume", "overpowering smell", "chemical fragrance"]),
+            ("Defective pump or leaky bottle", ["pump broke", "bottle leaked in transit", "dispenser doesn't work", "cap cracked"]),
+        ],
+        "praise_phrases": [
+            ("Noticeable skin improvement & hydration", ["glowing skin", "deeply hydrating", "cleared my skin", "visible results", "smoother"]),
+            ("Lightweight & fast absorbing", ["absorbs immediately", "non-greasy", "lightweight texture", "feels weightless"]),
+            ("Gentle on sensitive skin", ["no irritation", "gentle formula", "great for sensitive skin", "no breakouts"]),
+            ("Pleasant subtle scent", ["smells divine", "subtle fragrance", "unscented and clean", "delightful aroma"]),
+        ],
+    },
+    "software_apps": {
+        "key": "software_apps",
+        "name": "Software & Digital Apps",
+        "icon": "📱",
+        "description": "Mobile applications, SaaS tools, productivity software, and digital services.",
+        "detection_keywords": [
+            "app", "software", "application", "ui", "login", "download", "saas", "platform",
+            "subscription", "update", "mobile app", "desktop app", "website", "account", "tool"
+        ],
+        "attributes": [
+            "UI & Navigation Experience",
+            "Reliability & Bug Stability",
+            "Speed & Responsiveness",
+            "Features & Integrations",
+            "Customer Support & Updates",
+            "Pricing & Subscription Value",
+        ],
+        "attribute_lexicons": {
+            "UI & Navigation Experience": [
+                "ui", "interface", "intuitive", "easy to navigate", "confusing layout", "clean design", "modern look", "user experience"
+            ],
+            "Reliability & Bug Stability": [
+                "crashes", "bugs", "glitches", "freezes", "loading error", "server down", "sync issue", "stable", "login error"
+            ],
+            "Speed & Responsiveness": [
+                "speed", "fast", "responsive", "laggy", "battery drain", "slow load", "performance", "smooth"
+            ],
+            "Features & Integrations": [
+                "features", "integration", "missing feature", "workflow", "customization", "automation", "export", "capability"
+            ],
+            "Customer Support & Updates": [
+                "customer support", "support team", "response time", "resolved ticket", "update broke", "release notes"
+            ],
+            "Pricing & Subscription Value": [
+                "subscription", "price", "monthly cost", "free tier", "paywall", "expensive", "good value", "overpriced"
+            ],
+        },
+        "complaint_phrases": [
+            ("Frequent app crashes or login bugs", ["app crashes", "keeps freezing", "login error", "buggy update", "sync failed"]),
+            ("Aggressive paywalls / pricey tiers", ["expensive subscription", "locked behind paywall", "overpriced", "no free tier"]),
+            ("Cluttered or confusing user interface", ["confusing navigation", "cluttered ui", "hard to find settings", "steep learning curve"]),
+            ("Slow or unhelpful support", ["support never replied", "unhelpful agents", "ticket ignored", "poor customer support"]),
+        ],
+        "praise_phrases": [
+            ("Clean, intuitive, and modern UI", ["beautiful interface", "intuitive to use", "clean layout", "seamless user experience"]),
+            ("Reliable rock-solid performance", ["never crashes", "super reliable", "smooth performance", "fast loading"]),
+            ("Powerful features & seamless sync", ["great feature set", "syncs across devices effortlessly", "saves hours of work"]),
+            ("Responsive and helpful support", ["support fixed it fast", "friendly customer service", "great developer team"]),
+        ],
+    },
+    "general_consumer": {
+        "key": "general_consumer",
+        "name": "General Consumer Products",
+        "icon": "📦",
+        "description": "General consumer goods, household items, tools, and multi-category products.",
+        "detection_keywords": [],
+        "attributes": [
+            "Quality & Craftsmanship",
+            "Durability & Longevity",
+            "Usability & Ease of Use",
+            "Comfort & Design",
+            "Price & Value",
+            "Packaging & Shipping",
+        ],
+        "attribute_lexicons": {
+            "Quality & Craftsmanship": [
+                "build quality", "well made", "solid build", "poor quality", "flimsy", "craftsmanship", "materials", "premium feel"
+            ],
+            "Durability & Longevity": [
+                "durable", "durability", "long lasting", "broke", "broken", "wear and tear", "reliable", "lasted"
+            ],
+            "Usability & Ease of Use": [
+                "easy to use", "simple to use", "user friendly", "intuitive", "instructions", "hard to use"
+            ],
+            "Comfort & Design": [
+                "comfortable", "comfort", "ergonomic", "lightweight", "design", "look", "fits well"
+            ],
+            "Price & Value": [
+                "price", "cost", "expensive", "good value", "worth the money", "affordable", "overpriced"
+            ],
+            "Packaging & Shipping": [
+                "packaging", "shipping", "delivery", "arrived on time", "fast shipping", "damaged box"
+            ],
+        },
+        "complaint_phrases": COMPLAINT_PHRASES,
+        "praise_phrases": PRAISE_PHRASES,
+    },
+}
+
+_COMPILED_CATEGORY_ASPECTS_CACHE: dict[str, dict[str, re.Pattern]] = {}
+
+
+def get_category_info(cat_key_or_name: str | None) -> dict:
+    """Retrieve category definition dict by key or name, defaulting to general_consumer."""
+    if not cat_key_or_name:
+        return CATEGORY_TAXONOMY["general_consumer"]
+    
+    clean = str(cat_key_or_name).lower().strip()
+    if clean in CATEGORY_TAXONOMY:
+        return CATEGORY_TAXONOMY[clean]
+    
+    for key, data in CATEGORY_TAXONOMY.items():
+        if clean in data["name"].lower() or data["name"].lower() in clean:
+            return data
+    
+    return CATEGORY_TAXONOMY["general_consumer"]
+
+
+def get_compiled_category_aspects(category_key: str) -> dict[str, re.Pattern]:
+    """Returns precompiled regex patterns for all attributes of a category."""
+    if category_key in _COMPILED_CATEGORY_ASPECTS_CACHE:
+        return _COMPILED_CATEGORY_ASPECTS_CACHE[category_key]
+    
+    cat = get_category_info(category_key)
+    compiled = {}
+    for attr, kws in cat["attribute_lexicons"].items():
+        pats = [r"\b" + re.escape(k.lower()) + r"\b" for k in kws]
+        compiled[attr] = re.compile("|".join(pats), re.I)
+    
+    _COMPILED_CATEGORY_ASPECTS_CACHE[category_key] = compiled
+    return compiled
+
+
+def detect_product_category(title: str = "", reviews_text: str | list[str] = None, metadata_category: str = None) -> dict:
+    """
+    Intelligently identifies the product category using:
+    1. Explicit metadata category (if provided)
+    2. Product Title / Brand semantics
+    3. Corpus vocabulary distribution across reviews
+    Returns the resolved category definition with confidence and source.
+    """
+    # 1. Check explicit metadata category
+    if metadata_category and isinstance(metadata_category, str):
+        meta_low = metadata_category.lower()
+        for key, cat in CATEGORY_TAXONOMY.items():
+            if key == "general_consumer":
+                continue
+            if key in meta_low or cat["name"].lower() in meta_low:
+                res = dict(cat)
+                res["confidence"] = 0.98
+                res["detection_source"] = f"Dataset Metadata ('{metadata_category}')"
+                return res
+            if any(k in meta_low for k in cat["detection_keywords"]):
+                res = dict(cat)
+                res["confidence"] = 0.95
+                res["detection_source"] = f"Dataset Metadata ('{metadata_category}')"
+                return res
+
+    # 2. Check Product Title
+    title_low = str(title or "").lower()
+    if title_low:
+        title_scores = {}
+        for key, cat in CATEGORY_TAXONOMY.items():
+            if key == "general_consumer":
+                continue
+            score = 0
+            for kw in cat["detection_keywords"]:
+                if re.search(r"\b" + re.escape(kw) + r"\b", title_low):
+                    score += 3
+                elif kw in title_low:
+                    score += 1
+            if score > 0:
+                title_scores[key] = score
+        
+        if title_scores:
+            best_key = max(title_scores.items(), key=lambda x: x[1])[0]
+            res = dict(CATEGORY_TAXONOMY[best_key])
+            res["confidence"] = 0.92
+            res["detection_source"] = f"Product Title Keyword Match"
+            return res
+
+    # 3. Check Review Corpus Vocabulary
+    if reviews_text:
+        if isinstance(reviews_text, (list, tuple)):
+            sample_str = " ".join(str(r) for r in reviews_text[:250]).lower()
+        elif hasattr(reviews_text, "tolist"):
+            sample_str = " ".join(str(r) for r in reviews_text.tolist()[:250]).lower()
+        else:
+            sample_str = str(reviews_text)[:15000].lower()
+        corpus_scores = {}
+        for key, cat in CATEGORY_TAXONOMY.items():
+            if key == "general_consumer":
+                continue
+            matches = sum(sample_str.count(kw) for kw in cat["detection_keywords"][:12])
+            if matches > 0:
+                corpus_scores[key] = matches
+        
+        if corpus_scores:
+            best_key, best_count = max(corpus_scores.items(), key=lambda x: x[1])
+            if best_count >= 5:
+                res = dict(CATEGORY_TAXONOMY[best_key])
+                res["confidence"] = 0.85
+                res["detection_source"] = f"Review Corpus Vocabulary Analysis ({best_count} signals)"
+                return res
+
+    # Fallback to general consumer
+    fallback = dict(CATEGORY_TAXONOMY["general_consumer"])
+    fallback["confidence"] = 0.60
+    fallback["detection_source"] = "Universal Consumer Goods Baseline"
+    return fallback
+
