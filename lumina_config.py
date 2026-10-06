@@ -558,7 +558,16 @@ CATEGORY_TAXONOMY: dict[str, dict] = {
             "shirt", "t-shirt", "tshirt", "tee", "hoodie", "jacket", "pants", "trousers", "jeans",
             "dress", "cotton", "polyester", "fabric", "cloth", "garment", "wear", "apparel",
             "sweater", "shorts", "sweatshirt", "top", "sleeve", "collar", "underwear", "boxer",
-            "knit", "fleece", "crewneck", "v-neck"
+            "knit", "fleece", "crewneck", "v-neck",
+            # Fits, washes and denim vocabulary (titles often omit the garment noun)
+            "denim", "baggy", "baggy fit", "loose fit", "slim fit", "skinny fit", "straight fit",
+            "relaxed fit", "regular fit", "tapered fit", "bootcut", "heavy washed", "stone washed",
+            "acid wash", "mid rise", "high rise", "low rise", "fashion", "clothing",
+            # Common garment types incl. Indian ethnic wear
+            "chinos", "cargo", "cargos", "joggers", "track pants", "trackpants", "tracksuit",
+            "leggings", "jeggings", "blazer", "coat", "waistcoat", "polo", "kurta", "kurti",
+            "saree", "sari", "lehenga", "dupatta", "salwar", "pyjama", "pajama", "nightwear",
+            "innerwear", "lingerie", "vest", "shrug", "cardigan", "skirt", "jumpsuit"
         ],
         "attributes": [
             "Fabric & Material Quality",
@@ -608,6 +617,12 @@ CATEGORY_TAXONOMY: dict[str, dict] = {
             ("Inaccurate sizing (runs small/tight)", ["runs small", "runs very small", "size chart inaccurate", "too tight", "too short"]),
             ("Loose threads & weak seams", ["loose threads", "seam came undone", "stitching ripped", "unraveled", "poor stitching"]),
             ("Thin or see-through fabric", ["very thin", "see through", "cheap fabric", "rough material", "scratchy", "low quality cloth"]),
+            ("Color fading / bleeding after wash", ["color faded", "colour faded", "faded after", "color bleeding", "colour bleeding", "bleeds color", "lost its color", "fading"]),
+            ("Fit too loose / inconsistent sizing", ["too loose", "too big", "runs large", "size mismatch", "wrong size", "not as per size", "waist is loose", "length is too long"]),
+            ("Zipper, button or hardware defects", ["zipper broke", "zip broke", "zipper stuck", "button fell", "button came off", "broken button", "missing button"]),
+            ("Product differs from photos", ["not as shown", "different from picture", "different from image", "colour is different", "color is different", "not same as picture", "looks different"]),
+            ("Overpriced for the quality", ["overpriced", "too expensive", "not worth the price", "waste of money", "not worth it"]),
+            ("Late delivery / damaged parcel", ["late delivery", "delivered late", "arrived late", "delivery delay", "damaged package", "torn packet"]),
         ],
         "praise_phrases": [
             ("Ultra-soft & comfortable fabric", ["super soft", "great fabric", "feels amazing on skin", "breathable cotton", "comfortable"]),
@@ -924,8 +939,14 @@ CATEGORY_TAXONOMY: dict[str, dict] = {
                 "packaging", "shipping", "delivery", "arrived on time", "fast shipping", "damaged box"
             ],
         },
-        "complaint_phrases": COMPLAINT_PHRASES,
-        "praise_phrases": PRAISE_PHRASES,
+        "complaint_phrases": [
+            (label, kws) for label, kws in COMPLAINT_PHRASES
+            if label not in ("Battery drains quickly", "Battery overheating", "Won't connect")
+        ],
+        "praise_phrases": [
+            (label, kws) for label, kws in PRAISE_PHRASES
+            if label not in ("Great sound", "Long battery life")
+        ],
     },
 }
 

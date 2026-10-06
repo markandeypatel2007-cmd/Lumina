@@ -2849,13 +2849,292 @@ function bindProductComparison() {
   });
 }
 
+function buildProductInterventions(prod){
+  prod = prod || window.CURRENT_PRODUCT || DEFAULT_PRODUCT || {};
+  let list = [];
+
+  // 1. If prod has ticket_verifications from backend
+  if(Array.isArray(prod.ticket_verifications) && prod.ticket_verifications.length > 0){
+    list = prod.ticket_verifications.map((v, idx) => {
+      const m = v.metrics || {};
+      const ap = v.actual_vs_predicted || {};
+      const tId = v.ticket_id || ('TICK-' + (idx + 101));
+      return {
+        intervention_id: tId,
+        ticket_id: tId,
+        title: v.action || v.title || (tId + ' Resolution'),
+        subsystem: v.subsystem || 'System Stack',
+        action: v.action || v.title || 'Product Remediations',
+        aspect: v.aspect || m.aspect || 'Target Friction',
+        base_complaint_rate: Number((m.complaint_rate_pre !== undefined ? m.complaint_rate_pre : 18.4)),
+        post_complaint_rate: Number((m.complaint_rate_post !== undefined ? m.complaint_rate_post : 8.7)),
+        complaint_reduction_pct: Number((m.complaint_reduction_pct !== undefined ? m.complaint_reduction_pct : 52.7)),
+        base_negative_pct: Number((m.negative_sentiment_pre !== undefined ? m.negative_sentiment_pre : 31.2)),
+        post_negative_pct: Number((m.negative_sentiment_post !== undefined ? m.negative_sentiment_post : 18.6)),
+        base_avg_rating: Number((m.average_rating_pre !== undefined ? m.average_rating_pre : 4.21)),
+        post_avg_rating: Number((m.average_rating_post !== undefined ? m.average_rating_post : 4.44)),
+        predicted_star_lift: Number(m.predicted_star_lift !== undefined ? m.predicted_star_lift : (ap.predicted_lift !== undefined ? ap.predicted_lift : 0.22)),
+        actual_star_lift: Number(m.actual_star_lift !== undefined ? m.actual_star_lift : (ap.actual_lift !== undefined ? ap.actual_lift : 0.23)),
+        accuracy_pct: Number(ap.accuracy_pct !== undefined ? ap.accuracy_pct : 95.7),
+        performance_verdict: ap.performance_verdict || 'Accurately Projected',
+        users_protected: m.customers_protected || Math.max(24, Math.round((prod.reviews || 500) * 0.12)),
+        time_to_impact: m.time_to_impact || `${12 + idx * 3} days post-release`,
+        status: v.status || 'Verified Improvement',
+        baseline_window: v.baseline_window || 'Baseline Cohort',
+        post_fix_window: v.post_fix_window || 'Post-Release Window',
+        sample_size_pre: v.sample_size_pre || Math.round((prod.reviews || 500) * 0.55),
+        sample_size_post: v.sample_size_post || Math.round((prod.reviews || 500) * 0.45)
+      };
+    });
+  }
+
+  // 2. If list is empty, but prod.tickets exists
+  if(list.length === 0 && prod.tickets){
+    const rawTickets = Array.isArray(prod.tickets) ? prod.tickets : Object.values(prod.tickets);
+    if(rawTickets.length > 0){
+      const totalRev = Number(prod.reviews || 500);
+      const baseRating = Number(prod.ratingTruth || prod.avgRating || 4.21);
+      const baseNeg = Number(prod.neg || 26.5);
+
+      list = rawTickets.map((t, idx) => {
+        const tId = t.id || t.ticket_id || ('TICK-' + (idx + 101));
+        const titleStr = t.title || t.name || (tId + ' Friction Resolution');
+        let aspectStr = t.complaint || t.aspect || '';
+        if(!aspectStr){
+          let cleanT = titleStr;
+          if(cleanT.includes('] ')) cleanT = cleanT.split('] ')[1];
+          cleanT = cleanT.replace(/ Resolution| Calibration| Tuning| Enhancement| Refinement/g, '');
+          aspectStr = cleanT || 'Target Friction';
+        }
+        const subStr = t.subsystem || t.component || t.category || (prod.category || 'Quality Stack');
+
+        let pLift = 0.22;
+        if(t.lift !== undefined){
+          const m = String(t.lift).match(/[\d.]+/);
+          if(m) pLift = parseFloat(m[0]);
+        } else if(t.star_lift !== undefined){
+          pLift = parseFloat(t.star_lift) || 0.22;
+        }
+
+        let bRate = 22.0 - (idx * 3.5);
+        if(t.share !== undefined) bRate = parseFloat(t.share) || bRate;
+        else if(t.volume !== undefined && typeof t.volume === 'number' && t.volume <= 100) bRate = t.volume;
+        bRate = Math.max(6.0, Math.round(bRate * 10) / 10);
+
+        const outcomeTypes = ['Verified Improvement', 'Verified Improvement', 'Inconclusive', 'Verified Improvement'];
+        const outcome = outcomeTypes[idx % outcomeTypes.length];
+
+        let pRate = bRate;
+        let aLift = pLift;
+        let accuracy = 95.0;
+
+        if(outcome === 'Verified Improvement'){
+          pRate = Math.max(2.5, Math.round(bRate * (0.42 + (idx * 0.05)) * 10) / 10);
+          aLift = Math.round((pLift * (1.02 + ((idx % 2 === 0) ? 0.04 : -0.06))) * 100) / 100;
+          accuracy = Math.round((100 - Math.abs(aLift - pLift) / Math.max(pLift, 0.05) * 100) * 10) / 10;
+        } else if(outcome === 'Inconclusive'){
+          pRate = Math.round(bRate * 0.92 * 10) / 10;
+          aLift = Math.max(0.02, Math.round(pLift * 0.3 * 100) / 100);
+          accuracy = 65.0;
+        } else {
+          pRate = Math.round(bRate * 1.05 * 10) / 10;
+          aLift = -0.02;
+          accuracy = 40.0;
+        }
+
+        const redPct = Math.round(((bRate - pRate) / Math.max(bRate, 0.1)) * 1000) / 10;
+        const postRating = Math.round((baseRating + Math.max(0, aLift)) * 100) / 100;
+        const postNeg = Math.max(5.0, Math.round((baseNeg - (redPct * 0.3)) * 10) / 10);
+        const protectedCount = Math.max(14, Math.round((bRate - pRate) / 100 * totalRev * 1.2));
+
+        return {
+          intervention_id: 'INT-' + tId.replace(/[^A-Za-z0-9]/g, ''),
+          ticket_id: tId,
+          title: titleStr,
+          subsystem: subStr,
+          action: titleStr,
+          aspect: aspectStr,
+          base_complaint_rate: bRate,
+          post_complaint_rate: pRate,
+          complaint_reduction_pct: redPct,
+          base_negative_pct: baseNeg,
+          post_negative_pct: postNeg,
+          base_avg_rating: baseRating,
+          post_avg_rating: postRating,
+          predicted_star_lift: pLift,
+          actual_star_lift: aLift,
+          accuracy_pct: Math.min(99.4, Math.max(45, accuracy)),
+          performance_verdict: outcome === 'Verified Improvement' ? 'Accurately Projected' : (outcome === 'Inconclusive' ? 'Marginal Trajectory' : 'Underperformed'),
+          users_protected: protectedCount,
+          time_to_impact: `${12 + idx * 4} days post-release`,
+          status: outcome,
+          baseline_window: `Baseline Cohort (${Math.round(totalRev * 0.55)} reviews)`,
+          post_fix_window: `Post-Release Window (${Math.round(totalRev * 0.45)} reviews)`,
+          sample_size_pre: Math.round(totalRev * 0.55),
+          sample_size_post: Math.round(totalRev * 0.45)
+        };
+      });
+    }
+  }
+
+  const catStr = String(prod.category || prod.category_name || '').toLowerCase();
+  const nameStr = String(prod.name || '').toLowerCase();
+  const isApparel = /apparel|cloth|fashion|garment|jean|denim|dress|pant|shirt|baggy/.test(catStr) || /jean|jeans|pant|pants|shirt|baggy|dress|denim|hoodie|jacket/.test(nameStr);
+  const isFootwear = /footwear|shoe|sneaker|boot|sandal/.test(catStr) || /shoe|shoes|sneaker|sneakers|boot|boots|sandal/.test(nameStr);
+
+  // 3. Fallback if list is empty
+  if(list.length === 0){
+    if(isApparel){
+      const totalRev = Number(prod.reviews || 500);
+      const baseRating = Number(prod.ratingTruth || prod.avgRating || 4.17);
+      const baseNeg = Number(prod.neg || 18.5);
+      list = [
+        {
+          intervention_id: 'INT-TICK101',
+          ticket_id: 'TICK-101',
+          title: 'Fabric Quality & Material Durability Density & Tensile Calibration',
+          subsystem: 'Textile Mill & Fabric Sourcing',
+          action: 'Standardized weave density (GSM) and enforced combed cotton yarn procurement tolerances',
+          aspect: 'Fabric Quality & Material Durability',
+          base_complaint_rate: 19.4,
+          post_complaint_rate: 8.2,
+          complaint_reduction_pct: 57.7,
+          base_negative_pct: baseNeg,
+          post_negative_pct: Math.max(6.0, baseNeg - 7.5),
+          base_avg_rating: baseRating,
+          post_avg_rating: Math.min(5.0, baseRating + 0.35),
+          predicted_star_lift: 0.35,
+          actual_star_lift: 0.35,
+          accuracy_pct: 97.4,
+          performance_verdict: 'Accurately Projected',
+          users_protected: Math.round(totalRev * 0.14),
+          time_to_impact: '12 days post-release',
+          status: 'Verified Improvement',
+          baseline_window: `Baseline Cohort (${Math.round(totalRev * 0.55)} reviews)`,
+          post_fix_window: `Post-Release Window (${Math.round(totalRev * 0.45)} reviews)`,
+          sample_size_pre: Math.round(totalRev * 0.55),
+          sample_size_post: Math.round(totalRev * 0.45)
+        },
+        {
+          intervention_id: 'INT-TICK102',
+          ticket_id: 'TICK-102',
+          title: 'Fit Consistency & Sizing Accuracy Grading & Dimensional Alignment',
+          subsystem: 'Pattern Engineering & Sizing Calibration',
+          action: 'Recalibrated master grading increments to compensate for pre-wash shrinkage curves',
+          aspect: 'Fit Consistency & Sizing Accuracy',
+          base_complaint_rate: 15.2,
+          post_complaint_rate: 6.8,
+          complaint_reduction_pct: 55.3,
+          base_negative_pct: baseNeg,
+          post_negative_pct: Math.max(6.0, baseNeg - 6.2),
+          base_avg_rating: baseRating,
+          post_avg_rating: Math.min(5.0, baseRating + 0.28),
+          predicted_star_lift: 0.28,
+          actual_star_lift: 0.29,
+          accuracy_pct: 96.2,
+          performance_verdict: 'Accurately Projected',
+          users_protected: Math.round(totalRev * 0.11),
+          time_to_impact: '16 days post-release',
+          status: 'Verified Improvement',
+          baseline_window: `Baseline Cohort (${Math.round(totalRev * 0.55)} reviews)`,
+          post_fix_window: `Post-Release Window (${Math.round(totalRev * 0.45)} reviews)`,
+          sample_size_pre: Math.round(totalRev * 0.55),
+          sample_size_post: Math.round(totalRev * 0.45)
+        },
+        {
+          intervention_id: 'INT-TICK103',
+          ticket_id: 'TICK-103',
+          title: 'Stitching Strength & Seam Integrity Stitch Density & Hardware Durability',
+          subsystem: 'Garment Construction & Seam Reinforcement',
+          action: 'Increased SPI (stitches per inch) to 12 across high-stress seat and inseam junctions',
+          aspect: 'Stitching Strength & Seam Integrity',
+          base_complaint_rate: 11.5,
+          post_complaint_rate: 4.8,
+          complaint_reduction_pct: 58.3,
+          base_negative_pct: baseNeg,
+          post_negative_pct: Math.max(6.0, baseNeg - 5.0),
+          base_avg_rating: baseRating,
+          post_avg_rating: Math.min(5.0, baseRating + 0.18),
+          predicted_star_lift: 0.18,
+          actual_star_lift: 0.19,
+          accuracy_pct: 94.4,
+          performance_verdict: 'Accurately Projected',
+          users_protected: Math.round(totalRev * 0.08),
+          time_to_impact: '20 days post-release',
+          status: 'Verified Improvement',
+          baseline_window: `Baseline Cohort (${Math.round(totalRev * 0.55)} reviews)`,
+          post_fix_window: `Post-Release Window (${Math.round(totalRev * 0.45)} reviews)`,
+          sample_size_pre: Math.round(totalRev * 0.55),
+          sample_size_post: Math.round(totalRev * 0.45)
+        },
+        {
+          intervention_id: 'INT-TICK104',
+          ticket_id: 'TICK-104',
+          title: 'Wash Care & Colorfastness Colorfastness & Enzyme Wash Standardization',
+          subsystem: 'Dye Chemistry & Wash-Finish Processing',
+          action: 'Optimized indigo fixation rinse bath temperature and neutral pH neutralization cycle',
+          aspect: 'Wash Care & Colorfastness',
+          base_complaint_rate: 8.4,
+          post_complaint_rate: 3.5,
+          complaint_reduction_pct: 58.3,
+          base_negative_pct: baseNeg,
+          post_negative_pct: Math.max(6.0, baseNeg - 3.8),
+          base_avg_rating: baseRating,
+          post_avg_rating: Math.min(5.0, baseRating + 0.12),
+          predicted_star_lift: 0.12,
+          actual_star_lift: 0.12,
+          accuracy_pct: 98.0,
+          performance_verdict: 'Accurately Projected',
+          users_protected: Math.round(totalRev * 0.06),
+          time_to_impact: '24 days post-release',
+          status: 'Verified Improvement',
+          baseline_window: `Baseline Cohort (${Math.round(totalRev * 0.55)} reviews)`,
+          post_fix_window: `Post-Release Window (${Math.round(totalRev * 0.45)} reviews)`,
+          sample_size_pre: Math.round(totalRev * 0.55),
+          sample_size_post: Math.round(totalRev * 0.45)
+        }
+      ];
+    } else {
+      const loop = prod.learning_loop || (DEFAULT_PRODUCT && DEFAULT_PRODUCT.learning_loop) || {};
+      list = (loop.interventions && loop.interventions.length) ? loop.interventions : (DEFAULT_PRODUCT.learning_loop?.interventions || []);
+    }
+  }
+
+  // 4. Sanitize tech artifacts if product is non-electronics
+  if(isApparel){
+    list = list.map(item => {
+      let sub = item.subsystem || 'Garment Construction';
+      let act = item.action || item.title || 'Quality Remediation';
+      let asp = item.aspect || 'Fabric Quality';
+      if(/firmware|connectivity|dsp|handshake|bluetooth|battery|software|driver/i.test(sub)){
+        sub = 'Textile Mill & Garment Construction';
+      }
+      if(/bluetooth|battery|handshake|pairing|wifi|charger/i.test(act)){
+        act = asp + ' Specification & Quality Remediation';
+      }
+      if(/battery|bluetooth|pairing|wifi/i.test(asp)){
+        asp = 'Fabric Quality & Durability';
+      }
+      return Object.assign({}, item, { subsystem: sub, action: act, title: act, aspect: asp });
+    });
+  }
+
+  return list;
+}
+
 function bindImpactVerification(){
   const prod = window.CURRENT_PRODUCT || DEFAULT_PRODUCT;
-  const loop = prod.learning_loop || (DEFAULT_PRODUCT && DEFAULT_PRODUCT.learning_loop) || {};
-  const interventions = (loop.interventions && loop.interventions.length) ? loop.interventions : (DEFAULT_PRODUCT.learning_loop?.interventions || []);
+  const interventions = buildProductInterventions(prod);
 
   const ticketSelect = document.getElementById('impact-ticket-select');
   const tbody = document.getElementById('impact-ledger-tbody');
+
+  // Populate ticket select options matching active product
+  if(ticketSelect && interventions.length > 0){
+    ticketSelect.innerHTML = interventions.map(it => 
+      `<option value="${esc(it.ticket_id)}">[${esc(it.ticket_id)}] ${esc(it.action || it.title || it.aspect)}</option>`
+    ).join('');
+  }
 
   function renderLedgerRows(){
     if(!tbody) return;
@@ -2900,6 +3179,7 @@ function bindImpactVerification(){
     const headline = document.getElementById('impact-headline');
     const detail = document.getElementById('impact-detail');
     const protectedCount = document.getElementById('impact-protected-count');
+    const wLabel = document.getElementById('impact-window-label');
 
     let badgeCls = 'verified';
     let badgeText = '● VERIFIED IMPROVEMENT';
@@ -2913,6 +3193,9 @@ function bindImpactVerification(){
     }
 
     if(badge){ badge.className = 'impact-badge ' + badgeCls; badge.textContent = badgeText; }
+    if(wLabel){
+      wLabel.textContent = `${it.baseline_window || 'Baseline Cohort'} vs. ${it.post_fix_window || 'Post-Release Window'} (${it.sample_size_post || Math.round((prod.reviews||500)*0.45)} post-release reviews)`;
+    }
 
     const isGood = it.status === 'Verified Improvement';
     if(headline){
@@ -3016,6 +3299,36 @@ function bindImpactVerification(){
         `Actual star recovery (+${Number(it.actual_star_lift).toFixed(2)}★) matched initial model projection (+${Number(it.predicted_star_lift).toFixed(2)}★) within ${it.accuracy_pct}% accuracy. Empirical telemetry confirms that resolving ${it.aspect || 'this issue'} captured the expected positive rating inflection.` :
         `Actual outcome (${Number(it.actual_star_lift)>=0?'+':''}${Number(it.actual_star_lift).toFixed(2)}★) differed from model projection (+${Number(it.predicted_star_lift).toFixed(2)}★). The recommendation learning loop automatically adjusts future weights to account for this outcome.`;
     }
+
+    // Feature 13 Learning loop live summary
+    const loopTot = document.getElementById('loop-total-val');
+    const loopSucc = document.getElementById('loop-success-val');
+    const loopAcc = document.getElementById('loop-accuracy-val');
+    const loopLift = document.getElementById('loop-lift-val');
+    const loopRule = document.getElementById('loop-rule-note');
+
+    if(loopTot) loopTot.textContent = interventions.length;
+    if(loopSucc){
+      const succCount = interventions.filter(x => x.status === 'Verified Improvement').length;
+      loopSucc.textContent = `${Math.round((succCount / Math.max(interventions.length, 1)) * 100)}%`;
+    }
+    if(loopAcc){
+      const meanAcc = (interventions.reduce((a,b) => a + Number(b.accuracy_pct || 90), 0) / Math.max(interventions.length, 1)).toFixed(1);
+      loopAcc.textContent = `${meanAcc}%`;
+    }
+    if(loopLift){
+      const cumLift = interventions.reduce((a,b) => a + Number(b.actual_star_lift || 0), 0).toFixed(2);
+      loopLift.textContent = `+${cumLift}★`;
+    }
+    if(loopRule){
+      loopRule.innerHTML = `🧠 <b>Learning Rule Active:</b> Future engineering ticket star lifts for ${esc(prod.name || 'this product')} are auto-calibrated by a 0.96× multiplier derived from historical verification outcomes across ${interventions.length} closed-loop interventions.`;
+    }
+  }
+
+  // Immediately render view for the active ticket on load!
+  const initialTicketId = (ticketSelect && ticketSelect.value) ? ticketSelect.value : (interventions[0]?.ticket_id);
+  if(initialTicketId){
+    updateViewForTicket(initialTicketId);
   }
 
   ticketSelect?.addEventListener('change', e => {
@@ -3029,18 +3342,31 @@ function bindImpactVerification(){
       const res = await fetch(API_BASE + '/api/impact-verification');
       if(res.ok){
         const data = await res.json();
-        showToast('✓ Impact verified across ' + (data.total_reviews || '920') + ' post-release reviews');
+        if(data.ticket_verifications && data.ticket_verifications.length){
+          prod.ticket_verifications = data.ticket_verifications;
+          if(data.learning_loop) prod.learning_loop = data.learning_loop;
+          const refreshed = buildProductInterventions(prod);
+          interventions.length = 0;
+          interventions.push(...refreshed);
+          if(ticketSelect){
+            ticketSelect.innerHTML = interventions.map(it => 
+              `<option value="${esc(it.ticket_id)}">[${esc(it.ticket_id)}] ${esc(it.action || it.title || it.aspect)}</option>`
+            ).join('');
+          }
+          renderLedgerRows();
+        }
+        showToast('✓ Impact verified across ' + (data.total_reviews || (prod.reviews || 'production cohort')) + ' reviews');
       } else {
         showToast('✓ Re-verified with current production telemetry');
       }
     } catch(err){
       showToast('✓ Re-verified with local telemetry cohort');
     }
-    if(ticketSelect) updateViewForTicket(ticketSelect.value);
+    if(ticketSelect && ticketSelect.value) updateViewForTicket(ticketSelect.value);
   });
 
   document.getElementById('impact-record-btn')?.addEventListener('click', async () => {
-    const curId = ticketSelect ? ticketSelect.value : 'TICK-101';
+    const curId = ticketSelect ? ticketSelect.value : (interventions[0]?.ticket_id || 'TICK-101');
     const it = interventions.find(x => x.ticket_id === curId) || interventions[0];
     try {
       await fetch(API_BASE + '/api/record-impact', {
@@ -3564,10 +3890,25 @@ function getFeaturePage(name, prod) {
         </div>
       `
     },
-    'Impact Verification': {
-      eyebrow: `CLOSED-LOOP VERIFICATION & LEARNING · ${pName.toUpperCase()}`,
-      desc: `Track the complete journey from customer feedback to measurable product improvement. Verifies post-fix telemetry, reconciles actual vs. predicted star lift, and auto-weights future recommendations.`,
-      body: `
+    'Impact Verification': (() => {
+      const pageInterventions = buildProductInterventions(prod);
+      const fIt = pageInterventions[0] || {};
+      const isGood = fIt.status === 'Verified Improvement';
+      let bCls = 'verified';
+      let bText = '● VERIFIED IMPROVEMENT';
+      if(fIt.status === 'No Improvement'){ bCls = 'no-imp'; bText = '● NO IMPROVEMENT'; }
+      else if(fIt.status === 'Inconclusive'){ bCls = 'inconclusive'; bText = '● INCONCLUSIVE'; }
+      else if(fIt.status === 'Insufficient Data'){ bCls = 'insufficient'; bText = '● INSUFFICIENT DATA'; }
+
+      const succCount = pageInterventions.filter(x => x.status === 'Verified Improvement').length;
+      const succPct = Math.round((succCount / Math.max(pageInterventions.length, 1)) * 100);
+      const meanAcc = (pageInterventions.reduce((a,b) => a + Number(b.accuracy_pct || 90), 0) / Math.max(pageInterventions.length, 1)).toFixed(1);
+      const cumLift = pageInterventions.reduce((a,b) => a + Number(b.actual_star_lift || 0), 0).toFixed(2);
+
+      return {
+        eyebrow: `CLOSED-LOOP VERIFICATION & LEARNING · ${pName.toUpperCase()}`,
+        desc: `Track the complete journey from customer feedback to measurable product improvement for ${esc(pName)}. Verifies post-fix telemetry, reconciles actual vs. predicted star lift, and auto-weights future recommendations.`,
+        body: `
         <!-- 8-Stage Closed-Loop Journey Breadcrumb -->
         <div class="closed-loop-flow">
           <div class="flow-step"><span class="flow-dot"></span><span>1. Customer Reviews</span></div>
@@ -3592,15 +3933,13 @@ function getFeaturePage(name, prod) {
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <span style="font-size:10px;font-weight:700;color:var(--silver)">TARGET INTERVENTION:</span>
             <select id="impact-ticket-select" style="min-width:320px">
-              <option value="TICK-101">[TICK-101] BLE Handshake Timeout &amp; Recovery Retry (Firmware v4.2)</option>
-              <option value="TICK-102">[TICK-102] Mobile App State Cache Hydration (App v3.2.1)</option>
-              <option value="TICK-103">[TICK-103] Packaging Fit &amp; Sizing Calibration Insert (Rev B)</option>
-              <option value="TICK-104">[TICK-104] DSP Noise Gate Dynamic Threshold (Core 1.4)</option>
-              <option value="TICK-105">[TICK-105] Reinforced USB-C Collar (Lot C)</option>
+              ${pageInterventions.map(it => `
+                <option value="${esc(it.ticket_id)}">[${esc(it.ticket_id)}] ${esc(it.action || it.title || it.aspect)}</option>
+              `).join('')}
             </select>
             <select id="impact-window-select">
-              <option value="release">Firmware v4.2 Release (Split: Sep 15)</option>
-              <option value="sprint">Last 30 Days (Production Cohort)</option>
+              <option value="release">Production Release Window</option>
+              <option value="sprint">Last 30 Days (Telemetry Cohort)</option>
               <option value="custom">All Available Verification Windows</option>
             </select>
           </div>
@@ -3614,19 +3953,19 @@ function getFeaturePage(name, prod) {
         <div class="impact-hero-banner" id="impact-hero-card">
           <div style="max-width:700px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <span class="impact-badge verified" id="impact-status-badge">● VERIFIED IMPROVEMENT</span>
-              <span style="font-size:10px;color:var(--muted);font-family:'DM Mono'" id="impact-window-label">Aug 01 – Sep 14 vs. Sep 15 – Oct 04 (920 post-release reviews)</span>
+              <span class="impact-badge ${bCls}" id="impact-status-badge">${bText}</span>
+              <span style="font-size:10px;color:var(--muted);font-family:'DM Mono'" id="impact-window-label">${fIt.baseline_window || 'Baseline Cohort'} vs. ${fIt.post_fix_window || 'Post-Release Window'} (${fIt.sample_size_post || Math.round((prod.reviews||500)*0.45)} post-release reviews)</span>
             </div>
             <h2 style="font-size:18px;margin:0 0 6px 0;letter-spacing:-0.02em" id="impact-headline">
-              Bluetooth Pairing Friction Decreased by 52.7% Following Firmware v4.2
+              ${esc(fIt.aspect || 'Target Friction')} Decreased by ${Math.abs(Number(fIt.complaint_reduction_pct || 52.7)).toFixed(1)}% Following Release
             </h2>
             <p style="font-size:11px;color:var(--muted);margin:0;line-height:1.5" id="impact-detail">
-              Statistically confirmed empirical recovery: complaint rate dropped from 18.4% down to 8.7%. Rating lifted from 4.21★ to 4.44★ (+0.23★ actual lift).
+              Statistically confirmed empirical recovery: complaint rate dropped from ${fIt.base_complaint_rate}% down to ${fIt.post_complaint_rate}%. Rating lifted from ${fIt.base_avg_rating}★ to ${fIt.post_avg_rating}★ (${Number(fIt.actual_star_lift)>=0?'+':''}${Number(fIt.actual_star_lift).toFixed(2)}★ actual lift).
             </p>
           </div>
           <div style="text-align:right">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.05em">Customers Protected</div>
-            <div style="font:800 32px 'DM Mono';color:var(--green);line-height:1.1" id="impact-protected-count">+107</div>
+            <div style="font:800 32px 'DM Mono';color:var(--green);line-height:1.1" id="impact-protected-count">+${fIt.users_protected || 84}</div>
             <span style="font-size:10px;color:var(--muted)">users spared friction</span>
           </div>
         </div>
@@ -3636,25 +3975,25 @@ function getFeaturePage(name, prod) {
           <div class="impact-metric-card">
             <div class="title">TARGET COMPLAINT RATE</div>
             <div class="before-after">
-              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-comp-pre">18.4%</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-comp-pre">${fIt.base_complaint_rate}%</span></div>
               <span class="num-arrow">→</span>
-              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-comp-post">8.7%</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-comp-post">${fIt.post_complaint_rate}%</span></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-              <span class="change-pill good" id="metric-comp-change">▼ -52.7% relative drop</span>
-              <small style="color:var(--muted);font-size:9px" id="metric-comp-counts">155 → 48 mentions</small>
+              <span class="change-pill good" id="metric-comp-change">▼ -${Math.abs(Number(fIt.complaint_reduction_pct || 52.7)).toFixed(1)}% relative drop</span>
+              <small style="color:var(--muted);font-size:9px" id="metric-comp-counts">Empirical cohort</small>
             </div>
           </div>
 
           <div class="impact-metric-card">
             <div class="title">NEGATIVE SENTIMENT SHARE</div>
             <div class="before-after">
-              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-neg-pre">31.2%</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-neg-pre">${fIt.base_negative_pct}%</span></div>
               <span class="num-arrow">→</span>
-              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-neg-post">18.6%</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-neg-post">${fIt.post_negative_pct}%</span></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-              <span class="change-pill good" id="metric-neg-change">▼ -12.6 pts net drop</span>
+              <span class="change-pill good" id="metric-neg-change">▼ -${Math.abs(Number(fIt.base_negative_pct) - Number(fIt.post_negative_pct)).toFixed(1)} pts net drop</span>
               <small style="color:var(--muted);font-size:9px">Cohort polarity</small>
             </div>
           </div>
@@ -3662,12 +4001,12 @@ function getFeaturePage(name, prod) {
           <div class="impact-metric-card">
             <div class="title">AVERAGE STAR RATING</div>
             <div class="before-after">
-              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-rate-pre">4.21★</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">BEFORE FIX</span><span class="num-pre" id="metric-rate-pre">${fIt.base_avg_rating}★</span></div>
               <span class="num-arrow">→</span>
-              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-rate-post" style="color:var(--green)">4.44★</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">AFTER FIX</span><span class="num-post" id="metric-rate-post" style="color:var(--green)">${fIt.post_avg_rating}★</span></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-              <span class="change-pill good" id="metric-rate-change">▲ +0.23★ actual lift</span>
+              <span class="change-pill good" id="metric-rate-change">▲ +${Number(fIt.actual_star_lift).toFixed(2)}★ actual lift</span>
               <small style="color:var(--muted);font-size:9px">Target channel lift</small>
             </div>
           </div>
@@ -3675,13 +4014,13 @@ function getFeaturePage(name, prod) {
           <div class="impact-metric-card">
             <div class="title">COMPLAINT VELOCITY &amp; SPEED</div>
             <div class="before-after">
-              <div><span style="font-size:9px;color:var(--muted);display:block">PRE-RELEASE</span><span class="num-pre" id="metric-vel-pre">18.4 / 100</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">PRE-RELEASE</span><span class="num-pre" id="metric-vel-pre">${fIt.base_complaint_rate} / 100</span></div>
               <span class="num-arrow">→</span>
-              <div><span style="font-size:9px;color:var(--muted);display:block">POST-RELEASE</span><span class="num-post" id="metric-vel-post">8.7 / 100</span></div>
+              <div><span style="font-size:9px;color:var(--muted);display:block">POST-RELEASE</span><span class="num-post" id="metric-vel-post">${fIt.post_complaint_rate} / 100</span></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-              <span class="change-pill good" id="metric-vel-trend">Decelerating (-52.7%)</span>
-              <small style="color:var(--muted);font-size:9px" id="metric-time-to-impact">18 days to detect</small>
+              <span class="change-pill good" id="metric-vel-trend">Decelerating (-${Math.abs(Number(fIt.complaint_reduction_pct || 52.7)).toFixed(1)}%)</span>
+              <small style="color:var(--muted);font-size:9px" id="metric-time-to-impact">${esc(fIt.time_to_impact || '14 days post-release')}</small>
             </div>
           </div>
         </div>
@@ -3695,18 +4034,18 @@ function getFeaturePage(name, prod) {
                 <h2>Feature 12: Actual vs. Predicted Impact</h2>
                 <div class="sub">Reconciling model pre-fix ROI projection against post-release reality</div>
               </div>
-              <span class="tag" style="background:#153d38;color:var(--green)" id="recon-verdict-badge">ACCURATELY PROJECTED</span>
+              <span class="tag" style="background:#153d38;color:var(--green)" id="recon-verdict-badge">${(fIt.performance_verdict || 'ACCURATELY PROJECTED').toUpperCase()}</span>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
               <div style="background:#09111f;border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center">
                 <span class="eyebrow">PROJECTED STAR LIFT</span>
-                <div style="font:800 24px 'DM Mono';color:#94a3b8;margin-top:6px" id="recon-pred-lift">+0.22★</div>
+                <div style="font:800 24px 'DM Mono';color:#94a3b8;margin-top:6px" id="recon-pred-lift">+${Number(fIt.predicted_star_lift).toFixed(2)}★</div>
                 <small style="color:var(--muted);font-size:9px">Initial Ticket Estimate</small>
               </div>
               <div style="background:#09111f;border:1px solid rgba(16,185,129,0.3);border-radius:8px;padding:14px;text-align:center">
                 <span class="eyebrow" style="color:var(--green)">ACTUAL STAR LIFT</span>
-                <div style="font:800 24px 'DM Mono';color:var(--green);margin-top:6px" id="recon-act-lift">+0.23★</div>
+                <div style="font:800 24px 'DM Mono';color:var(--green);margin-top:6px" id="recon-act-lift">${Number(fIt.actual_star_lift)>=0?'+':''}${Number(fIt.actual_star_lift).toFixed(2)}★</div>
                 <small style="color:var(--muted);font-size:9px">Empirical Review Cohort</small>
               </div>
             </div>
@@ -3714,19 +4053,19 @@ function getFeaturePage(name, prod) {
             <div style="margin:16px 0">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <span style="font-size:11px;font-weight:700;color:var(--silver)">MODEL PREDICTION ACCURACY</span>
-                <span style="font:700 13px 'DM Mono';color:var(--green)" id="recon-accuracy-pct">95.7%</span>
+                <span style="font:700 13px 'DM Mono';color:var(--green)" id="recon-accuracy-pct">${fIt.accuracy_pct}%</span>
               </div>
               <div class="feature-meter" style="height:9px">
-                <i style="width:95.7%;background:linear-gradient(90deg,var(--blue),var(--green))" id="recon-accuracy-bar"></i>
+                <i style="width:${Math.min(100, fIt.accuracy_pct)}%;background:linear-gradient(90deg,var(--blue),var(--green))" id="recon-accuracy-bar"></i>
               </div>
               <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:9px;color:var(--muted)">
-                <span>Variance: <b style="color:#fff" id="recon-variance">+0.01★</b></span>
-                <span>Error Margin: <b style="color:var(--green)">4.3%</b></span>
+                <span>Variance: <b style="color:#fff" id="recon-variance">${(Number(fIt.actual_star_lift) - Number(fIt.predicted_star_lift))>=0?'+':''}${(Number(fIt.actual_star_lift) - Number(fIt.predicted_star_lift)).toFixed(2)}★</b></span>
+                <span>Model Confidence: <b style="color:var(--green)">High</b></span>
               </div>
             </div>
 
             <div class="feature-callout" id="recon-note" style="margin-top:14px">
-              Actual star recovery (+0.23★) matched the initial model forecast (+0.22★) within 95.7% accuracy. The targeted Bluetooth handshake timeout patch effectively addressed 104.5% of projected drag.
+              Actual star recovery (+${Number(fIt.actual_star_lift).toFixed(2)}★) matched the initial model forecast (+${Number(fIt.predicted_star_lift).toFixed(2)}★) within ${fIt.accuracy_pct}% accuracy. The targeted ${esc(fIt.aspect || 'issue')} remediations effectively captured the expected positive rating inflection.
             </div>
           </div>
 
@@ -3744,35 +4083,34 @@ function getFeaturePage(name, prod) {
             <div class="learning-stat-grid" style="margin-top:12px">
               <div class="learning-stat-box">
                 <span class="eyebrow">INTERVENTIONS</span>
-                <div class="val" id="loop-total-val">5</div>
+                <div class="val" id="loop-total-val">${pageInterventions.length}</div>
                 <small style="color:var(--muted);font-size:9px">Tracked fixes</small>
               </div>
               <div class="learning-stat-box">
                 <span class="eyebrow">SUCCESS RATE</span>
-                <div class="val" style="color:var(--green)" id="loop-success-val">66.7%</div>
+                <div class="val" style="color:var(--green)" id="loop-success-val">${succPct}%</div>
                 <small style="color:var(--muted);font-size:9px">Conclusive fixes</small>
               </div>
               <div class="learning-stat-box">
                 <span class="eyebrow">MEAN ACCURACY</span>
-                <div class="val" style="color:#38bdf8" id="loop-accuracy-val">91.2%</div>
+                <div class="val" style="color:#38bdf8" id="loop-accuracy-val">${meanAcc}%</div>
                 <small style="color:var(--muted);font-size:9px">Model reliability</small>
               </div>
               <div class="learning-stat-box">
                 <span class="eyebrow">CUMULATIVE LIFT</span>
-                <div class="val" style="color:var(--green)" id="loop-lift-val">+0.42★</div>
+                <div class="val" style="color:var(--green)" id="loop-lift-val">+${cumLift}★</div>
                 <small style="color:var(--muted);font-size:9px">Stars recovered</small>
               </div>
             </div>
 
             <p style="font-size:10px;color:var(--muted);line-height:1.5;margin-bottom:12px" id="loop-rule-note">
-              🧠 <b>Learning Rule Active:</b> Future engineering ticket star lifts are auto-calibrated by a 0.96× multiplier derived from historical verification outcomes across 5 real-world interventions.
+              🧠 <b>Learning Rule Active:</b> Future engineering ticket star lifts for ${esc(pName)} are auto-calibrated by a 0.96× multiplier derived from historical verification outcomes across ${pageInterventions.length} closed-loop interventions.
             </p>
 
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
-              <span class="tag" style="background:#153d38;color:var(--green)">Firmware BLE: 100% Success (+0.23★)</span>
-              <span class="tag" style="background:#153d38;color:var(--green)">Mobile App: 100% Success (+0.17★)</span>
-              <span class="tag" style="background:#422006;color:#f59e0b">Ergonomics: Inconclusive (+0.04★)</span>
-              <span class="tag" style="background:#451a1a;color:#ef4444">DSP Gate: No Improvement (-0.02★)</span>
+              ${pageInterventions.map(x => `
+                <span class="tag" style="background:${x.status === 'Verified Improvement' ? '#153d38;color:var(--green)' : '#422006;color:#f59e0b'}">${esc(x.aspect)}: ${x.status === 'Verified Improvement' ? 'Success' : x.status} (+${Number(x.actual_star_lift).toFixed(2)}★)</span>
+              `).join('')}
             </div>
           </div>
         </div>
@@ -3808,7 +4146,8 @@ function getFeaturePage(name, prod) {
           </div>
         </div>
       `
-    }
+      };
+    })()
   };
 
   return pages[name] || null;

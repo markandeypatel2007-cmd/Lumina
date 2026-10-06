@@ -48,7 +48,9 @@ CATEGORY_CLASSIFIER_RULES: dict[str, dict[str, list[str]]] = {
             "shirt", "t-shirt", "tee", "hoodie", "jacket", "pants", "jeans", "dress",
             "sweater", "coat", "shorts", "underwear", "boxer", "bra", "leggings",
             "blouse", "top", "vest", "suit", "skirt", "cardigan", "apparel", "clothing",
-            "garment", "fabric", "cotton", "polyester", "wool", "fleece", "denim"
+            "garment", "fabric", "cotton", "polyester", "wool", "fleece", "denim",
+            "baggy", "baggy fit", "loose fit", "relaxed fit", "washed", "heavy washed",
+            "chinos", "cargo", "trousers", "joggers", "trackpants", "fashion", "fit"
         ],
         "category_hints": ["clothing", "apparel", "men's fashion", "women's fashion", "textile"]
     },
@@ -1048,8 +1050,8 @@ def classify_product(
             # Exact word boundary match
             if re.search(r"\b" + re.escape(kw) + r"\b", combined_title):
                 scores[cat] += 4.5
-            elif kw in combined_title:
-                scores[cat] += 2.5
+            elif len(kw) >= 5 and kw in combined_title:
+                scores[cat] += 2.0
 
             # Spec matches
             if kw in spec_str:
